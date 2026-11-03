@@ -90,3 +90,41 @@ What changed: First working code, generated from an approved spec with acceptanc
 itself on the first run by finding an edge case (years below 1000) that a hand-written unit test would not have
 covered. Note for the write-up: the fix constrained the generator rather than the schema, which is the right call
 since the app never produces such dates, but it is worth stating explicitly as a deliberate scoping decision.
+
+## 2026-11-03 — Spec 2: necrotalk-interpreter (requirements, design, tasks)
+Surface: CLI, model switched from Auto to claude-sonnet-4.5 (1.3x) for this spec's documents
+Features: spec, pbt, steering (necrotalk.md conditional steering active)
+What I asked for: Spec from BRIEF section 4 and the necrotalk steering: tokenizer, recursive-descent parser, AST
+printer, tree-walking evaluator with message passing and `pass`, a host interface so the evaluator has no DOM
+dependency, line-numbered errors, PBT on parse/print/parse, put/read, and navigation range.
+What Kiro did: 465-line requirements, 455-line design, 17 tasks. Review before execution found two architectural
+problems and several gaps, all fixed by one revision prompt (also on Sonnet):
+- Dialogs were synchronous (`answer(): string`), which only works with window.prompt and the retro-ui steering
+  forbids that. Evaluator made async from the start; retrofitting later would touch every statement and test.
+- Object references were bare strings, so `show field "Answer"` and `set the label of button "X"` could not be
+  represented, even though the fixtures already use them. Added an ObjectRef node carried through to the host.
+- Printer had no parenthesization rule, so the round-trip PBT would have failed on `(1 + 2) * 3`.
+- No line numbers on AST nodes, so runtime errors could not satisfy the steering's `Line N:` format.
+- Navigation semantics undefined; added a pure resolveNavigation with HyperCard wrap-around and errors.
+- No guard against `repeat while true`; added a 100,000-statement execution budget.
+- Variable semantics undefined; made names case-insensitive, unset variables evaluate to their own name.
+Spec grew to 1,654 lines after revision.
+What changed: The model choice was deliberate and it cost most of the free plan's 50 credits. The sync-to-async and
+ObjectRef catches alone justified it; both would have been multi-day refactors if found during execution.
+
+## 2026-11-03 — Spec 2 executed (tasks 1 to 17), interrupted by credit exhaustion
+Surface: CLI, back on Auto
+Features: spec, pbt
+What I asked for: Execute tasks in order. Stopped after Task 2 when the free plan ran out (49.38 of 50 credits).
+Resumed next morning with: "Continue from Task 3 and run through Task 17 without stopping between tasks. Only stop if
+a task's acceptance check fails twice in a row."
+What Kiro did: Delivered the full interpreter: ast, errors, tokenizer, parser with printer, navigation, evaluator,
+messageQueue, plus a fixtures smoke test. 11 test files, 198 tests, three PBTs at 200 runs each, typecheck, lint,
+and build all clean, no forbidden imports. The parse/print/parse PBT found real printer bugs during execution, visible
+in the regression tests Kiro added afterwards: `-(-b)` printed as `--b`, which the tokenizer reads as a comment;
+`a is (not b)` printed without parens and re-parsed as the `is not` operator; unary and chunk expressions needed their
+own parenthesization rules beyond the binary-operator rule in the design.
+What changed: The interpreter exists and is testable in Node with a mock host. Lesson on credits: a 17-task spec on
+Auto costs roughly as much as the free plan allows per month; the hackathon credit grant is the real budget.
+Known small deviations from HyperCard to revisit later, not blockers: division by zero yields "Infinity" instead of
+an error; `contains` is case-sensitive; `toNumber` accepts "12abc" as 12.
