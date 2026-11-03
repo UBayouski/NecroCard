@@ -1,0 +1,26 @@
+# Dependencies and build output
+node_modules/
+dist/
+.vite/
+coverage/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Editor and OS noise
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+
+# Playwright
+test-results/
+playwright-report/
+
+# IMPORTANT (Kiroween 2026 rules): the /.kiro directory and all its sub-folders
+# MUST be committed. Never add .kiro, .kiro/specs, .kiro/hooks, .kiro/steering,
+# .kiro/agents or .kiro/settings to this file.
