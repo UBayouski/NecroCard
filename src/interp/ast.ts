@@ -16,15 +16,15 @@
 // ---------------------------------------------------------------------------
 
 /**
- * A reference to a named card object (button, field, image) or structural
- * object (card, background, stack) or the implicit current object (me).
- * Used in show/hide/set/get-property/field-container contexts.
+ * A reference to a named object, or to `me` (the object whose script is running).
+ * The name is any expression (usually a string literal); `button x` is valid.
+ * `background` and `stack` references, and nameless references other than `me`,
+ * are parse errors in this version.
+ * Used in show/hide/set/the-property-of/field-container and field-read contexts.
  */
-export interface ObjectRef {
-  type: 'button' | 'field' | 'image' | 'card' | 'background' | 'stack' | 'me';
-  /** The object's name expression. Absent for 'me' and bare 'stack'/'card' references. */
-  name?: ExpressionNode;
-}
+export type ObjectRef =
+  | { type: 'button' | 'field' | 'image' | 'card'; name: ExpressionNode }
+  | { type: 'me' };
 
 // ---------------------------------------------------------------------------
 // Script and handler
@@ -39,9 +39,9 @@ export interface ScriptNode {
 /** A single `on <name> [params] ... end <name>` block. */
 export interface HandlerNode {
   kind: 'handler';
-  /** Handler name, stored lowercased. */
+  /** Handler name as written in the source. Compared case-insensitively. */
   name: string;
-  /** Parameter names, stored lowercased. */
+  /** Parameter names, stored lowercased (they are variables). */
   params: string[];
   body: StatementNode[];
 }
@@ -67,7 +67,8 @@ export type StatementNode =
   | RepeatStatement
   | ExitStatement
   | NextRepeatStatement
-  | PassStatement;
+  | PassStatement
+  | CallStatement;
 
 // ---------------------------------------------------------------------------
 // Navigation statements
@@ -212,6 +213,17 @@ export interface PassStatement {
   line: number;
 }
 
+/**
+ * Custom handler call: `<name> [arg, arg...]` where <name> is not a keyword.
+ * Calls the handler <name> in the same script. Name is kept as written; lookup is case-insensitive.
+ */
+export interface CallStatement {
+  kind: 'call';
+  name: string;
+  args: ExpressionNode[];
+  line: number;
+}
+
 // ---------------------------------------------------------------------------
 // Container node (put/get target)
 // ---------------------------------------------------------------------------
@@ -240,7 +252,8 @@ export type ExpressionNode =
   | FunctionCallExpression
   | PropertyExpression
   | ChunkExpression
-  | CountExpression;
+  | CountExpression
+  | FieldExpression;
 
 // ---------------------------------------------------------------------------
 // Expression nodes
@@ -323,4 +336,13 @@ export interface CountExpression {
   kind: 'count';
   what: 'cards' | 'words' | 'lines' | 'chars';
   source?: ExpressionNode;
+}
+
+/**
+ * A field reference in expression position: `field "Score"` evaluates to the field's text.
+ * `ref.type` is always 'field'.
+ */
+export interface FieldExpression {
+  kind: 'field';
+  ref: { type: 'field'; name: ExpressionNode };
 }

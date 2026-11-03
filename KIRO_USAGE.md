@@ -128,3 +128,50 @@ What changed: The interpreter exists and is testable in Node with a mock host. L
 Auto costs roughly as much as the free plan allows per month; the hackathon credit grant is the real budget.
 Known small deviations from HyperCard to revisit later, not blockers: division by zero yields "Infinity" instead of
 an error; `contains` is case-sensitive; `toNumber` accepts "12abc" as 12.
+
+## 2026-11-03 — Hooks, MCP, and a custom reviewer agent
+Surface: CLI (Auto)
+Features: hook, mcp, agent
+What I asked for: Two hooks (tests on save under src/, typecheck and lint before finishing a task), Playwright MCP in
+.kiro/settings/mcp.json, and a read-only custom agent `necrotalk-reviewer` that checks src/interp/ against BRIEF
+section 4 and the necrotalk steering.
+What Kiro did: Created .kiro/hooks/test-on-save.json and typecheck-lint-before-finish.json. Added an `npm run check`
+script because PowerShell 5.1 cannot run `&&` chains while npm's cmd shell can. Noted that Kiro cannot make a
+"finish" hook blocking, so it reports instead. Created .kiro/agents/necrotalk-reviewer.md with only the read tool and
+no MCP or Powers, ending every review with PASS or FINDINGS.
+What changed: The reviewer's first run on code that already had 198 passing tests returned 19 findings. The important
+ones were real: custom handlers could not be called by name even though the frozen grammar requires it; a single-line
+`else if` could close an if block without `end if`; misplaced `pass` and `exit repeat` escaped as internal exceptions
+instead of `Line N:` errors; two error messages leaked AST node names. The rest were deliberate additions that the
+brief had not caught up with (unary minus, `me`, count of lines/chars, nested read-only chunks), so the brief and
+steering were updated rather than the code.
+
+## 2026-11-03 — Interpreter hardening through four reviewer rounds
+Surface: CLI (Auto)
+Features: agent, spec, pbt, steering
+What I asked for: Fix the reviewer's bugs, settle the open semantics (field reads in expressions, `me`, reserved
+words, answer button limit, arity checks, parse-time rejection of `do` and `sort`), mirror each decision from the
+brief into the steering file, and rerun the reviewer until it passes.
+What Kiro did: Four reviewer rounds. Round 2 found the biggest gap of the whole spec: nothing could read a field's
+text in an expression, so `put field "Score" + 1 into field "Score"` was impossible and the quiz fixture could never
+work. Added a FieldExpression node. Also found that `me` could not be resolved because the dispatcher never told the
+evaluator whose script was running; MessageContext now carries object, card, background, and stack refs and `me`
+follows the message chain. Kiro replaced my ObjectRef-to-host design with a ResolvedObjectRef { type, name } because
+names became expressions, which is the right call. Later rounds caught: `go to card 1.5` sending a fractional index
+to the host; a lone `"` at end of script tokenizing as an empty string; `constructor(1)` and `__proto__(1)` resolving
+JavaScript prototype internals instead of failing as unknown functions; error messages containing raw line breaks
+from field text. Final state: 272 tests, three PBTs re-run on extra seeds, typecheck and lint clean. Last remaining
+finding was a documentation gap (grouping parentheses not listed in the brief), fixed in the brief.
+What changed: A read-only reviewer agent with a narrow brief found more real defects than the test suite did, at a
+fraction of the credit cost of a full agent, because it compares code to a written contract instead of running it.
+The `__proto__` catch is the kind of thing that only surfaces when something is reading the code with an adversarial
+checklist.
+
+Final two rounds (after the brief gained the grouping-parentheses line): the reviewer found four real bugs in
+variable scoping that no test had covered. Globals were readable without a `global` declaration while writes went to
+a shadow local; `global x` overwrote the stack-wide value with an existing local; `put "*" after stars` on an unset
+variable produced `stars***` because unset variables evaluate to their own name even as a put target; reserved words
+in expression position gave a generic "Expected an expression". All fixed with regression tests. Reviewer verdict:
+PASS. Final counts: 279 tests in 11 files, typecheck and lint clean, property tests re-run on extra seeds.
+Two undecided edge cases were left as they are and noted: a keyword at statement start reports Unknown command
+rather than reserved word, and a same-line `else <stmt>` is accepted inside a block that still needs `end if`.

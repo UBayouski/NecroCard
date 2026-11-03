@@ -192,3 +192,13 @@ describe('tokenize — eof', () => {
     expect(toks[0].type).toBe('eof');
   });
 });
+
+describe('tokenize — regression: lone trailing quote', () => {
+  it('a lone " at the very end of the source is an unterminated string', () => {
+    expect(() => tokenize('beep "')).toThrow('Line 1: Unterminated string literal.');
+  });
+
+  it('an empty string literal at the end is still valid', () => {
+    expect(tokenize('""')[0]).toMatchObject({ type: 'string', value: '' });
+  });
+});

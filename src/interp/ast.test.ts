@@ -139,13 +139,11 @@ describe('AST types compile and construct', () => {
     const refs: ObjectRef[] = [
       { type: 'button', name: { kind: 'literal', value: 'OK' } },
       { type: 'field', name: { kind: 'literal', value: 'Name' } },
-      { type: 'image' },
-      { type: 'card' },
-      { type: 'background' },
-      { type: 'stack' },
+      { type: 'image', name: { kind: 'variable', name: 'pic' } },
+      { type: 'card', name: { kind: 'literal', value: 'Home' } },
       { type: 'me' },
     ];
-    expect(refs).toHaveLength(7);
+    expect(refs).toHaveLength(5);
   });
 
   it('can construct ContainerNode for all kinds', () => {

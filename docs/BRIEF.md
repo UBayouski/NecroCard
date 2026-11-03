@@ -40,7 +40,8 @@ Freeze this list in the interpreter spec. Anything not listed is out of scope fo
 
 **Structure**
 - `on <handler> [params] ... end <handler>` with system handlers `mouseUp`, `mouseDown`, `openCard`, `closeCard`,
-  `openStack`, and custom handlers invoked by name.
+  `openStack`, and custom handlers invoked by name: a statement `<name> [arg, arg...]` calls the handler `<name>`
+  in the same script; if no such handler exists, it is a runtime error `Unknown command "<name>"`.
 - Message passing order: object, card, background, stack.
 - Comments start with `--`.
 
@@ -52,13 +53,27 @@ Freeze this list in the interpreter spec. Anything not listed is out of scope fo
 - `put <expr> into <container>` where container is `field "Name"`, a local variable, or `it`.
 - `put <expr> before | after <container>`.
 - `get <expr>` sets `it`.
-- `set <property> of <object> to <expr>`; readable properties also via `the <property> of <object>`.
+- `set [the] <property> of <object> to <expr>`; readable properties also via `the <property> of <object>`.
+- Object references: `button <expr>`, `field <expr>`, `image <expr>`, `card <expr>`, and `me`. The name is any
+  expression, usually a string literal, so `button x` with a variable `x` is valid. `background` and `stack`
+  references, and references with no name other than `me`, are parse errors in this version.
+- `me` is the object whose script is currently running. When a message passes up the chain, `me` becomes the card,
+  background, or stack whose script handles it. The dispatcher supplies this to the evaluator.
+- A field reference in expression position evaluates to the field's text: `put field "Score" + 1 into field "Score"`.
+- A bare `the <name>` with no object is valid only for `the date` and `the time`; anything else is a runtime error
+  `Unknown property "<name>"`.
+- Reserved words (every keyword in the tokenizer) cannot be used as variable or handler names; the parser rejects
+  them with `"<word>" is a reserved word`.
+- `do` and `sort` are rejected at parse time with the exact messages from the steering examples, so Summon can
+  catch them before a script is loaded.
 - `global <var>` declares a stack-wide variable.
-- `answer <expr> [with <btn1> [or <btn2> [or <btn3>]]]`, result in `it`.
+- `answer <expr> [with <btn1> [or <btn2> [or <btn3>]]]`, result in `it`. No `with` means one "OK" button. More than
+  three buttons is a parse error, as in HyperCard.
 - `ask <expr> [with <default>]`, result in `it`.
 
 **Control flow**
-- `if <expr> then <stmt>` and `if <expr> then ... [else ...] end if`.
+- `if <expr> then <stmt>` and `if <expr> then ... [else ...] end if`. `else if <expr> then` chains share a single
+  `end if`, as in HyperTalk; they parse to nested if statements.
 - `repeat <N> times ... end repeat`, `repeat with <var> = <a> to <b> ... end repeat`, `repeat while <expr>`.
 - `exit <handler>`, `next repeat`, `exit repeat`.
 - `pass <handler>`: hand the message on to the next object in the message path (object, card, background, stack).
@@ -68,11 +83,19 @@ Freeze this list in the interpreter spec. Anything not listed is out of scope fo
 
 **Expressions**
 - Numbers, strings in double quotes, variables, `true`/`false`.
-- Arithmetic `+ - * / mod ^`, concatenation `&` and `&&` (with space).
+- Arithmetic `+ - * / mod ^`, unary minus, concatenation `&` and `&&` (with space).
+- Grouping parentheses `( <expr> )` anywhere an expression is allowed, including computed object names such as
+  `field ("Q" & n)`. An object name binds tightly, so `field "Score" + 1` means `(field "Score") + 1`.
 - Comparison `= <> < > <= >=`, also `is`, `is not`, `contains`.
 - Logic `and`, `or`, `not`.
-- Functions: `the number of cards`, `the number of words of <expr>`, `the date`, `the time`, `random(N)`,
-  `length(<expr>)`, `word N of <expr>`, `line N of <expr>`, `char N of <expr>`.
+- Functions: `the number of cards`, `the number of words | lines | chars of <expr>`, `the date`, `the time`,
+  `random(N)`, `length(<expr>)`, `word N of <expr>`, `line N of <expr>`, `char N of <expr>`. Chunks may nest for
+  reading (`char 1 of word 2 of x`); this fell out of the parser design at no cost and is allowed.
+- Any `<name>(<args>)` parses as a function call; calling a function that does not exist is a runtime error
+  `Unknown function "<name>"` with the line number. Built-in functions check their argument count:
+  `random` and `length` take exactly one argument, otherwise `Line N: random expects 1 argument`.
+- Calling a handler by name is limited to 200 nested calls; deeper recursion is a runtime error. Inside a handler
+  that was called directly (not via a message), `pass` simply ends that handler.
 
 **Phase 2 (only after the core above is implemented, tested, and Summon works end to end)**
 
@@ -88,8 +111,8 @@ but no spec task for them is created until the core is done. Order of value:
    already dispatches messages, so this is a small addition. No `send ... to HyperCard` or to other stacks.
 
 **Out of scope (do not add during the hackathon)**: paint commands, external commands (XCMD/XFCN), menus, `sort`,
-`do` (it is eval and breaks ahead-of-time validation of generated scripts), chunk ranges (`word 2 to 4`), nested
-chunks, chunks as put targets, number formatting.
+`do` (it is eval and breaks ahead-of-time validation of generated scripts), chunk ranges (`word 2 to 4`),
+chunks as put targets, number formatting.
 
 ## 5. Editor
 

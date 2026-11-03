@@ -1,5 +1,5 @@
 import { tokenize } from './tokenizer.js';
-import type { Token, TokenType } from './tokenizer.js';
+import type { Token } from './tokenizer.js';
 import { NecroTalkError, formatError } from './errors.js';
 import type {
   ScriptNode, HandlerNode, StatementNode, ExpressionNode,
@@ -7,10 +7,10 @@ import type {
   PutStatement, GetStatement, SetStatement, GlobalStatement,
   AnswerStatement, AskStatement, ShowStatement, HideStatement, BeepStatement,
   IfStatement, RepeatStatement, RepeatVariant,
-  ExitStatement, NextRepeatStatement, PassStatement,
+  ExitStatement, NextRepeatStatement, PassStatement, CallStatement,
   LiteralExpression, VariableExpression, BinaryExpression, BinaryOp,
   UnaryExpression, FunctionCallExpression, PropertyExpression,
-  ChunkExpression, CountExpression,
+  ChunkExpression, CountExpression, FieldExpression,
   ObjectRef, ContainerNode,
 } from './ast.js';
 
@@ -57,6 +57,30 @@ class Parser {
     return tok.type === 'keyword' && tok.value === value;
   }
 
+  /** Plain-English description of a token for "found ..." clauses. */
+  private describe(tok: Token): string {
+    if (tok.type === 'newline') return 'end of line';
+    if (tok.type === 'eof') return 'end of script';
+    return `"${tok.value}"`;
+  }
+
+  private error(tok: Token, msg: string): NecroTalkError {
+    return new NecroTalkError(formatError(tok.line, tok.column, msg), tok.line, tok.column);
+  }
+
+  /**
+   * Read a user-chosen name (variable, parameter, handler). Reserved words are
+   * rejected with `"<word>" is a reserved word`. Returns the name as written.
+   * @param what used in the "Expected ..." message when no name is present
+   */
+  private expectName(what: string): string {
+    const tok = this.current;
+    if (tok.type === 'keyword') throw this.error(tok, `"${tok.value}" is a reserved word`);
+    if (tok.type !== 'identifier') throw this.error(tok, `Expected ${what} but found ${this.describe(tok)}`);
+    this.advance();
+    return tok.value;
+  }
+
   private matchKeyword(value: string): boolean {
     if (this.isKeyword(value)) { this.advance(); return true; }
     return false;
@@ -64,22 +88,7 @@ class Parser {
 
   private expectKeyword(value: string): Token {
     if (!this.isKeyword(value)) {
-      const cur = this.current;
-      throw new NecroTalkError(
-        formatError(cur.line, cur.column, `Expected "${value}" but found "${cur.value}"`),
-        cur.line, cur.column,
-      );
-    }
-    return this.advance();
-  }
-
-  private expectType(type: TokenType): Token {
-    if (this.current.type !== type) {
-      const cur = this.current;
-      throw new NecroTalkError(
-        formatError(cur.line, cur.column, `Expected ${type} but found "${cur.value}"`),
-        cur.line, cur.column,
-      );
+      throw this.error(this.current, `Expected "${value}" but found ${this.describe(this.current)}`);
     }
     return this.advance();
   }
@@ -92,11 +101,7 @@ class Parser {
     if (this.current.type === 'newline' || this.current.type === 'eof') {
       this.skipNewlines();
     } else {
-      const cur = this.current;
-      throw new NecroTalkError(
-        formatError(cur.line, cur.column, `Expected end of line but found "${cur.value}"`),
-        cur.line, cur.column,
-      );
+      throw this.error(this.current, `Expected end of line but found ${this.describe(this.current)}`);
     }
   }
 
@@ -110,11 +115,8 @@ class Parser {
       if (this.isKeyword('on')) {
         handlers.push(this.parseHandler());
       } else {
-        const cur = this.current;
-        throw new NecroTalkError(
-          formatError(cur.line, cur.column, `Expected "on" to begin a handler but found "${cur.value}"`),
-          cur.line, cur.column,
-        );
+        throw this.error(this.current,
+          `Expected "on" to begin a handler but found ${this.describe(this.current)}`);
       }
       this.skipNewlines();
     }
@@ -126,28 +128,16 @@ class Parser {
   // ---------------------------------------------------------------------------
   parseHandler(): HandlerNode {
     this.expectKeyword('on');
-    const nameTok = this.current;
-    if (nameTok.type !== 'identifier' && nameTok.type !== 'keyword') {
-      throw new NecroTalkError(
-        formatError(nameTok.line, nameTok.column, `Expected handler name but found "${nameTok.value}"`),
-        nameTok.line, nameTok.column,
-      );
-    }
-    const name = nameTok.value.toLowerCase();
-    this.advance();
+    // Handler name keeps its source case; comparisons are case-insensitive
+    const name = this.expectName('a handler name');
 
-    // Optional parameters (comma-separated identifiers on same line)
+    // Optional parameters: comma-separated variable names on the same line
     const params: string[] = [];
-    while (this.current.type !== 'newline' && this.current.type !== 'eof') {
-      if (this.current.type === 'punctuation' && this.current.value === ',') {
+    if (this.current.type !== 'newline' && this.current.type !== 'eof') {
+      params.push(this.expectName('a parameter name').toLowerCase());
+      while (this.current.type === 'punctuation' && this.current.value === ',') {
         this.advance();
-        continue;
-      }
-      if (this.current.type === 'identifier' || this.current.type === 'keyword') {
-        params.push(this.current.value.toLowerCase());
-        this.advance();
-      } else {
-        break;
+        params.push(this.expectName('a parameter name').toLowerCase());
       }
     }
     this.expectNewlineOrEof();
@@ -156,14 +146,13 @@ class Parser {
 
     this.expectKeyword('end');
     const endNameTok = this.current;
-    const endName = (endNameTok.type === 'identifier' || endNameTok.type === 'keyword')
-      ? endNameTok.value.toLowerCase() : '';
-    if (endName !== name) {
-      throw new NecroTalkError(
-        formatError(endNameTok.line, endNameTok.column,
-          `Expected "end ${name}" but found "end ${endNameTok.value}"`),
-        endNameTok.line, endNameTok.column,
-      );
+    const endMatches = (endNameTok.type === 'identifier' || endNameTok.type === 'keyword')
+      && endNameTok.value.toLowerCase() === name.toLowerCase();
+    if (!endMatches) {
+      const found = endNameTok.type === 'newline' || endNameTok.type === 'eof'
+        ? `"end" followed by ${this.describe(endNameTok)}`
+        : `"end ${endNameTok.value}"`;
+      throw this.error(endNameTok, `Expected "end ${name}" but found ${found}`);
     }
     this.advance();
     this.skipNewlines();
@@ -181,10 +170,8 @@ class Parser {
       const cur = this.current;
       if (cur.type === 'eof') {
         if (context !== 'handler') {
-          throw new NecroTalkError(
-            formatError(cur.line, cur.column, `Unexpected end of file inside "${context}"`),
-            cur.line, cur.column,
-          );
+          const block = context === 'repeat' ? 'repeat' : 'if';
+          throw this.error(cur, `Expected "end ${block}" but found end of script`);
         }
         break;
       }
@@ -233,20 +220,40 @@ class Parser {
         }
         case 'pass': {
           this.advance();
-          const nameTok = this.current;
-          const handlerName = (nameTok.type === 'identifier' || nameTok.type === 'keyword')
-            ? nameTok.value.toLowerCase() : '';
-          if (!handlerName) {
-            throw new NecroTalkError(
-              formatError(nameTok.line, nameTok.column, `Expected handler name after "pass"`),
-              nameTok.line, nameTok.column,
-            );
-          }
-          this.advance();
+          const handlerName = this.expectName('a handler name after "pass"');
           this.expectNewlineOrEof();
           return { kind: 'pass', handlerName, line } satisfies PassStatement;
         }
       }
+    }
+
+    // Custom handler call: `<name> [arg, arg...]` where <name> is not a keyword
+    if (cur.type === 'identifier') {
+      const lower = cur.value.toLowerCase();
+      // Out-of-scope commands are rejected ahead of time (steering error examples)
+      if (lower === 'do') {
+        throw new NecroTalkError(
+          formatError(cur.line, cur.column, '"do" is not allowed in NecroTalk'),
+          cur.line, cur.column,
+        );
+      }
+      if (lower === 'sort') {
+        throw new NecroTalkError(
+          formatError(cur.line, cur.column, 'Unknown command "sort". NecroTalk does not support sort'),
+          cur.line, cur.column,
+        );
+      }
+      this.advance();
+      const args: ExpressionNode[] = [];
+      if (this.current.type !== 'newline' && this.current.type !== 'eof') {
+        args.push(this.parseExpression());
+        while (this.current.type === 'punctuation' && this.current.value === ',') {
+          this.advance();
+          args.push(this.parseExpression());
+        }
+      }
+      this.expectNewlineOrEof();
+      return { kind: 'call', name: cur.value, args, line } satisfies CallStatement;
     }
 
     // Unknown
@@ -321,10 +328,7 @@ class Parser {
         return { kind: 'visualEffect', effect: 'wipe right', line };
       }
     }
-    throw new NecroTalkError(
-      formatError(tok.line, tok.column, `Unknown visual effect "${tok.value}"`),
-      tok.line, tok.column,
-    );
+    throw this.error(tok, `Unknown visual effect ${this.describe(tok)}`);
   }
 
   // ---------------------------------------------------------------------------
@@ -369,13 +373,11 @@ class Parser {
   parseSet(): SetStatement {
     const line = this.current.line;
     this.expectKeyword('set');
-    // set <property> of <objectRef> to <expr>
+    // set [the] <property> of <objectRef> to <expr>
+    this.matchKeyword('the');
     const propTok = this.current;
     if (propTok.type !== 'identifier' && propTok.type !== 'keyword') {
-      throw new NecroTalkError(
-        formatError(propTok.line, propTok.column, `Expected property name after "set"`),
-        propTok.line, propTok.column,
-      );
+      throw this.error(propTok, `Expected property name after "set" but found ${this.describe(propTok)}`);
     }
     const property = propTok.value;
     this.advance();
@@ -393,15 +395,7 @@ class Parser {
   parseGlobal(): GlobalStatement {
     const line = this.current.line;
     this.expectKeyword('global');
-    const nameTok = this.current;
-    if (nameTok.type !== 'identifier' && nameTok.type !== 'keyword') {
-      throw new NecroTalkError(
-        formatError(nameTok.line, nameTok.column, `Expected variable name after "global"`),
-        nameTok.line, nameTok.column,
-      );
-    }
-    const varName = nameTok.value.toLowerCase();
-    this.advance();
+    const varName = this.expectName('a variable name after "global"').toLowerCase();
     this.expectNewlineOrEof();
     return { kind: 'global', varName, line };
   }
@@ -424,7 +418,11 @@ class Parser {
       }
       buttons.push(b1Tok.value);
       this.advance();
-      while (this.matchKeyword('or')) {
+      while (this.isKeyword('or')) {
+        const orTok = this.advance();
+        if (buttons.length === 3) {
+          throw this.error(orTok, '"answer" accepts at most three buttons');
+        }
         const btnTok = this.current;
         if (btnTok.type !== 'string') {
           throw new NecroTalkError(
@@ -478,43 +476,60 @@ class Parser {
   // ---------------------------------------------------------------------------
   // if
   // ---------------------------------------------------------------------------
-  parseIf(): IfStatement {
+  /**
+   * Parse an if statement.
+   * @param chained true when this `if` follows `else` inside a multi-line block
+   *   (`else if <cond> then ...`). A chained if is always part of the enclosing
+   *   block: even in its single-line form (`else if c then <stmt>`) it must still
+   *   be closed by the block's `end if`.
+   */
+  parseIf(chained = false): IfStatement {
     const line = this.current.line;
     this.expectKeyword('if');
     const condition = this.parseExpression();
     this.expectKeyword('then');
 
-    // Single-line if: if <cond> then <stmt> (no newline between then and stmt)
+    let thenBranch: StatementNode[];
     if (this.current.type !== 'newline' && this.current.type !== 'eof') {
+      // Statement on the same line as `then`
       const stmt = this.parseStatement();
-      // optional else on same line is NOT standard HyperTalk single-line — skip
-      return { kind: 'if', condition, thenBranch: [stmt], line };
+      // A standalone single-line if ends here (no else, no end if)
+      if (!chained) return { kind: 'if', condition, thenBranch: [stmt], line };
+      thenBranch = [stmt];
+      this.skipNewlines();
+      // A chained single-line branch may be followed by more statements before else/end if
+      thenBranch.push(...this.parseStatementList('if'));
+    } else {
+      // Multi-line if
+      this.skipNewlines();
+      thenBranch = this.parseStatementList('if');
     }
-
-    // Multi-line if
-    this.skipNewlines();
-    const thenBranch = this.parseStatementList('if');
 
     let elseBranch: StatementNode[] | undefined;
     if (this.matchKeyword('else')) {
-      // else if sugar
       if (this.isKeyword('if')) {
-        const innerIf = this.parseIf();
-        elseBranch = [innerIf];
+        // else if sugar: the chained if consumes the shared `end if`
+        elseBranch = [this.parseIf(true)];
       } else {
         this.skipNewlines();
         elseBranch = this.parseStatementList('else');
-        this.expectKeyword('end');
-        this.expectKeyword('if');
-        this.expectNewlineOrEof();
+        this.expectEndIf();
       }
     } else {
-      this.expectKeyword('end');
-      this.expectKeyword('if');
-      this.expectNewlineOrEof();
+      this.expectEndIf();
     }
 
     return { kind: 'if', condition, thenBranch, elseBranch, line };
+  }
+
+  private expectEndIf(): void {
+    const cur = this.current;
+    if (cur.type === 'eof') {
+      throw this.error(cur, 'Expected "end if" but found end of script');
+    }
+    this.expectKeyword('end');
+    this.expectKeyword('if');
+    this.expectNewlineOrEof();
   }
 
   // ---------------------------------------------------------------------------
@@ -530,16 +545,7 @@ class Parser {
       this.expectNewlineOrEof();
       variant = { type: 'while', condition };
     } else if (this.matchKeyword('with')) {
-      const varTok = this.current;
-      const varName = (varTok.type === 'identifier' || varTok.type === 'keyword')
-        ? varTok.value.toLowerCase() : '';
-      if (!varName) {
-        throw new NecroTalkError(
-          formatError(varTok.line, varTok.column, `Expected variable name in "repeat with"`),
-          varTok.line, varTok.column,
-        );
-      }
-      this.advance();
+      const varName = this.expectName('a variable name in "repeat with"').toLowerCase();
       if (!this.current || (this.current.type !== 'operator' || this.current.value !== '=')) {
         const cur = this.current;
         throw new NecroTalkError(
@@ -574,60 +580,49 @@ class Parser {
   parseExit(): ExitStatement {
     const line = this.current.line;
     this.expectKeyword('exit');
-    const tok = this.current;
     if (this.matchKeyword('repeat')) {
       this.expectNewlineOrEof();
       return { kind: 'exit', target: 'repeat', line };
     }
-    if (tok.type === 'identifier' || tok.type === 'keyword') {
-      const name = tok.value.toLowerCase();
-      this.advance();
-      this.expectNewlineOrEof();
-      return { kind: 'exit', target: name, line };
-    }
-    throw new NecroTalkError(
-      formatError(tok.line, tok.column, `Expected handler name or "repeat" after "exit"`),
-      tok.line, tok.column,
-    );
+    const name = this.expectName('a handler name or "repeat" after "exit"');
+    this.expectNewlineOrEof();
+    return { kind: 'exit', target: name, line };
   }
 
   // ---------------------------------------------------------------------------
   // ObjectRef parser
   // ---------------------------------------------------------------------------
+  /**
+   * `button <expr>`, `field <expr>`, `image <expr>`, `card <expr>`, or `me`.
+   * The name binds as a primary (like a chunk source), so `field "Score" + 1`
+   * means (field "Score") + 1; parenthesize a compound name.
+   */
   parseObjectRef(): ObjectRef {
     const cur = this.current;
-    const objTypes = ['button', 'field', 'image', 'card', 'background', 'stack', 'me'] as const;
-
-    for (const t of objTypes) {
-      if (this.isKeyword(t)) {
-        this.advance();
-        if (t === 'me' || t === 'stack' || t === 'card' || t === 'background') {
-          // may or may not have a name string
-          if (this.current.type === 'string') {
-            const name: ExpressionNode = { kind: 'literal', value: this.current.value };
-            this.advance();
-            return { type: t, name };
-          }
-          return { type: t };
+    if (this.matchKeyword('me')) return { type: 'me' };
+    if (this.isKeyword('background') || this.isKeyword('stack')) {
+      throw this.error(cur, `"${cur.value}" references are not supported in NecroTalk`);
+    }
+    for (const t of ['button', 'field', 'image', 'card'] as const) {
+      if (this.matchKeyword(t)) {
+        if (!this.startsPrimary()) {
+          throw this.error(this.current, `Expected a name after "${t}" but found ${this.describe(this.current)}`);
         }
-        // button, field, image — expect quoted name or identifier
-        if (this.current.type === 'string') {
-          const name: ExpressionNode = { kind: 'literal', value: this.current.value };
-          this.advance();
-          return { type: t, name };
-        }
-        if (this.current.type === 'identifier') {
-          const name: ExpressionNode = { kind: 'variable', name: this.current.value.toLowerCase() };
-          this.advance();
-          return { type: t, name };
-        }
-        return { type: t };
+        return { type: t, name: this.parsePrimary() };
       }
     }
-    throw new NecroTalkError(
-      formatError(cur.line, cur.column, `Expected object type (button, field, etc.) but found "${cur.value}"`),
-      cur.line, cur.column,
-    );
+    throw this.error(cur, `Expected an object (button, field, image, card, or me) but found ${this.describe(cur)}`);
+  }
+
+  /** True if the current token can begin a primary expression (an object name). */
+  private startsPrimary(): boolean {
+    const t = this.current;
+    if (t.type === 'number' || t.type === 'string' || t.type === 'identifier') return true;
+    if (t.type === 'punctuation') return t.value === '(';
+    if (t.type === 'keyword') {
+      return ['true', 'false', 'the', 'it', 'word', 'line', 'char', 'field'].includes(t.value);
+    }
+    return false;
   }
 
   // ---------------------------------------------------------------------------
@@ -643,15 +638,12 @@ class Parser {
       return { kind: 'it' };
     }
     if (this.current.type === 'identifier' || this.current.type === 'keyword') {
-      const name = this.current.value.toLowerCase();
-      this.advance();
+      // expectName rejects keywords with `"<word>" is a reserved word`
+      const name = this.expectName('a container').toLowerCase();
       return { kind: 'variable', name };
     }
-    const cur = this.current;
-    throw new NecroTalkError(
-      formatError(cur.line, cur.column, `Expected container (field, variable, or "it") but found "${cur.value}"`),
-      cur.line, cur.column,
-    );
+    throw this.error(this.current,
+      `Expected a container (field, variable, or "it") but found ${this.describe(this.current)}`);
   }
 
   // ---------------------------------------------------------------------------
@@ -730,14 +722,16 @@ class Parser {
       this.advance();
       const expr = this.parseExpression(0);
       if (!(this.current.type === 'punctuation' && this.current.value === ')')) {
-        const c = this.current;
-        throw new NecroTalkError(
-          formatError(c.line, c.column, `Expected ")" but found "${c.value}"`),
-          c.line, c.column,
-        );
+        throw this.error(this.current, `Expected ")" but found ${this.describe(this.current)}`);
       }
       this.advance();
       return expr;
+    }
+
+    // Field read: `field <name>` evaluates to the field's text
+    if (cur.type === 'keyword' && cur.value === 'field') {
+      const ref = this.parseObjectRef() as { type: 'field'; name: ExpressionNode };
+      return { kind: 'field', ref } satisfies FieldExpression;
     }
 
     // Number literal
@@ -814,10 +808,10 @@ class Parser {
       return { kind: 'variable', name: cur.value.toLowerCase() } satisfies VariableExpression;
     }
 
-    throw new NecroTalkError(
-      formatError(cur.line, cur.column, `Expected expression but found "${cur.value}"`),
-      cur.line, cur.column,
-    );
+    // Any other keyword here is a reserved word misused as a value
+    if (cur.type === 'keyword') throw this.error(cur, `"${cur.value}" is a reserved word`);
+
+    throw this.error(cur, `Expected an expression but found ${this.describe(cur)}`);
   }
 
   /**
@@ -966,6 +960,7 @@ function printStatement(stmt: StatementNode, depth: number): string[] {
     case 'exit': return [`${i}exit ${stmt.target}`];
     case 'nextRepeat': return [`${i}next repeat`];
     case 'pass': return [`${i}pass ${stmt.handlerName}`];
+    case 'call': return [`${i}${stmt.name}${stmt.args.length ? ' ' + stmt.args.map(printExpr).join(', ') : ''}`];
     case 'if': return printIf(stmt, depth);
     case 'repeat': return printRepeat(stmt, depth);
     default: return [`${i}-- unknown stmt`];
@@ -1027,13 +1022,10 @@ function printContainer(c: ContainerNode): string {
 }
 
 function printObjectRef(ref: ObjectRef): string {
-  if (!ref.name) return ref.type;
-  const nameStr = printExpr(ref.name);
-  // If the name expression is a literal string, print with quotes
-  if (ref.name.kind === 'literal' && typeof ref.name.value === 'string') {
-    return `${ref.type} "${ref.name.value}"`;
-  }
-  return `${ref.type} ${nameStr}`;
+  if (ref.type === 'me') return 'me';
+  // The parser reads an object name as a primary; wrap anything non-atomic
+  const name = isAtomic(ref.name) ? printExpr(ref.name) : `(${printExpr(ref.name)})`;
+  return `${ref.type} ${name}`;
 }
 
 // Precedence of a child expression for parenthesization decisions.
@@ -1094,6 +1086,7 @@ function printExpr(expr: ExpressionNode): string {
         : `-(${printExpr(operand)})`;
     }
     case 'functionCall': return `${expr.name}(${expr.args.map(printExpr).join(', ')})`;
+    case 'field': return printObjectRef(expr.ref);
     case 'property': {
       if (expr.object) return `the ${expr.property} of ${printObjectRef(expr.object)}`;
       return `the ${expr.property}`;

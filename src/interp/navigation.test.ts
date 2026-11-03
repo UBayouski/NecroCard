@@ -112,3 +112,16 @@ describe('PBT — navigation range invariant', () => {
     );
   });
 });
+
+describe('regression — third reviewer pass', () => {
+  it('a fractional card number is a NecroTalkError, not a fractional index', () => {
+    expect(() => resolveNavigation({ type: 'card', value: 1.5 }, 0, COUNT, NAMES, 4))
+      .toThrow('Line 4: Card number 1.5 is not a whole number.');
+  });
+
+  it('navigating a stack with no cards is a NecroTalkError', () => {
+    for (const target of [{ type: 'next' }, { type: 'prev' }, { type: 'last' }] as GoTarget[]) {
+      expect(() => resolveNavigation(target, 0, 0, [], 2)).toThrow('Line 2: The stack has no cards.');
+    }
+  });
+});

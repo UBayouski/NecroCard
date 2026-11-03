@@ -96,26 +96,19 @@ export function tokenize(source: string): Token[] {
     if (ch === '"') {
       pos++; // skip opening quote
       let str = '';
+      let closed = false;
       while (pos < source.length) {
         const c = source[pos];
-        if (c === '\n' || c === '\r') {
-          throw new NecroTalkError(
-            formatError(startLine, startCol, 'Unterminated string literal'),
-            startLine, startCol,
-          );
-        }
-        if (c === '"') {
-          pos++; // skip closing quote
-          break;
-        }
-        str += c;
+        if (c === '\n' || c === '\r') break; // strings cannot span lines
         pos++;
-        if (pos >= source.length) {
-          throw new NecroTalkError(
-            formatError(startLine, startCol, 'Unterminated string literal'),
-            startLine, startCol,
-          );
-        }
+        if (c === '"') { closed = true; break; }
+        str += c;
+      }
+      if (!closed) {
+        throw new NecroTalkError(
+          formatError(startLine, startCol, 'Unterminated string literal'),
+          startLine, startCol,
+        );
       }
       tokens.push(makeToken('string', str, startLine, startCol));
       continue;

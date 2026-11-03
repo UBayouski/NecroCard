@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { dispatchMessage } from './messageQueue.js';
+import type { MessageContext } from './messageQueue.js';
 import { NecroTalkError } from './errors.js';
-import type { HostInterface } from './evaluator.js';
-import type { ObjectRef } from './ast.js';
+import type { HostInterface, ResolvedObjectRef } from './evaluator.js';
 
 class MockHost implements HostInterface {
   beepCount = 0;
+  /** Refs received by show/hide, in call order. */
+  shown: ResolvedObjectRef[] = [];
   goToCard(_i: number): Promise<void> { return Promise.resolve(); }
   getCurrentCardIndex() { return 0; }
   getCardCount() { return 1; }
@@ -13,22 +15,31 @@ class MockHost implements HostInterface {
   setVisualEffect(_e: string): Promise<void> { return Promise.resolve(); }
   answer(_p: string, _b: string[]): Promise<string> { return Promise.resolve('OK'); }
   ask(_p: string, _d: string): Promise<string> { return Promise.resolve(''); }
-  showObject(_r: ObjectRef) {}
-  hideObject(_r: ObjectRef) {}
-  getProperty(_r: ObjectRef, _p: string) { return ''; }
-  setProperty(_r: ObjectRef, _p: string, _v: string) {}
-  getFieldText(_r: ObjectRef) { return ''; }
-  setFieldText(_r: ObjectRef, _t: string) {}
+  showObject(r: ResolvedObjectRef) { this.shown.push(r); }
+  hideObject(r: ResolvedObjectRef) { this.shown.push(r); }
+  getProperty(_r: ResolvedObjectRef, _p: string) { return ''; }
+  setProperty(_r: ResolvedObjectRef, _p: string, _v: string) {}
+  getFieldText(_r: ResolvedObjectRef) { return ''; }
+  setFieldText(_r: ResolvedObjectRef, _t: string) {}
   beep() { this.beepCount++; }
   getDate() { return ''; }
   getTime() { return ''; }
   random(_n: number) { return 1; }
 }
 
-const baseContext = {
+const BUTTON: ResolvedObjectRef = { type: 'button', name: 'Go' };
+const CARD: ResolvedObjectRef = { type: 'card', name: 'Home' };
+const BACKGROUND: ResolvedObjectRef = { type: 'background', name: 'Default' };
+const STACK: ResolvedObjectRef = { type: 'stack', name: 'Spooky' };
+
+const baseContext: MessageContext = {
+  object: BUTTON,
   cardScript: '',
+  card: CARD,
   backgroundScript: '',
+  background: BACKGROUND,
   stackScript: '',
+  stack: STACK,
 };
 
 describe('dispatchMessage', () => {
@@ -95,12 +106,45 @@ describe('dispatchMessage', () => {
     const sharedScript = 'on mouseUp\n  beep\nend mouseUp';
     const host = new MockHost();
     await dispatchMessage('mouseUp', [], {
+      ...baseContext,
       objectScript: '',
       cardScript: sharedScript,
       backgroundScript: sharedScript,
-      stackScript: '',
     }, host, new Map());
     // card handled it; background never ran
     expect(host.beepCount).toBe(1);
+  });
+});
+
+describe('dispatchMessage — me follows the message path', () => {
+  const showMe = (h: string) => `on ${h}\n  show me\nend ${h}`;
+  const showMeThenPass = (h: string) => `on ${h}\n  show me\n  pass ${h}\nend ${h}`;
+
+  it('me is the object for the object script', async () => {
+    const host = new MockHost();
+    await dispatchMessage('mouseUp', [], { ...baseContext, objectScript: showMe('mouseUp') }, host, new Map());
+    expect(host.shown).toEqual([BUTTON]);
+  });
+
+  it('me becomes card, background, then stack as the message is passed', async () => {
+    const host = new MockHost();
+    await dispatchMessage('mouseUp', [], {
+      ...baseContext,
+      objectScript: showMeThenPass('mouseUp'),
+      cardScript: showMeThenPass('mouseUp'),
+      backgroundScript: showMeThenPass('mouseUp'),
+      stackScript: showMe('mouseUp'),
+    }, host, new Map());
+    expect(host.shown).toEqual([BUTTON, CARD, BACKGROUND, STACK]);
+  });
+
+  it('me is the card when the card script handles a message the object lacks', async () => {
+    const host = new MockHost();
+    await dispatchMessage('mouseUp', [], {
+      ...baseContext,
+      objectScript: showMe('openCard'),
+      cardScript: showMe('mouseUp'),
+    }, host, new Map());
+    expect(host.shown).toEqual([CARD]);
   });
 });

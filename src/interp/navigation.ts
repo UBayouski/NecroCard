@@ -21,6 +21,9 @@ export function resolveNavigation(
   cardNames: string[],
   sourceLine = 0,
 ): number {
+  if (cardCount < 1) {
+    throw new NecroTalkError(formatError(sourceLine, 1, 'The stack has no cards'), sourceLine, 1);
+  }
   switch (target.type) {
     case 'next':
       return (currentIndex + 1) % cardCount;
@@ -33,6 +36,12 @@ export function resolveNavigation(
     case 'card': {
       if (typeof target.value === 'number') {
         const n = target.value; // 1-based
+        if (!Number.isInteger(n)) {
+          throw new NecroTalkError(
+            formatError(sourceLine, 1, `Card number ${n} is not a whole number`),
+            sourceLine, 1,
+          );
+        }
         if (n < 1 || n > cardCount) {
           throw new NecroTalkError(
             formatError(sourceLine, 1, `Card index ${n} is out of range`),

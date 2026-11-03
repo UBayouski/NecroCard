@@ -35,7 +35,7 @@ function firstStmt(src: string): StatementNode {
 describe('parser — handler structure', () => {
   it('parses a minimal handler', () => {
     const h = parseOne('on mouseUp\n  beep\nend mouseUp');
-    expect(h.name).toBe('mouseup');
+    expect(h.name).toBe('mouseUp');
     expect(h.body).toHaveLength(1);
     expect(h.body[0].kind).toBe('beep');
   });
@@ -119,7 +119,7 @@ describe('parser — show/hide', () => {
     const stmt = firstStmt('on h\n  show field "Answer"\nend h') as ShowStatement;
     expect(stmt.kind).toBe('show');
     expect(stmt.object.type).toBe('field');
-    expect((stmt.object.name as LiteralExpression).value).toBe('Answer');
+    if (stmt.object.type !== 'me') expect((stmt.object.name as LiteralExpression).value).toBe('Answer');
   });
 
   it('parses hide button "OK"', () => {
@@ -151,13 +151,17 @@ describe('parser — exit/next/pass', () => {
 
   it('parses pass', () => {
     const stmt = firstStmt('on h\n  pass mouseUp\nend h') as PassStatement;
-    expect(stmt.handlerName).toBe('mouseup');
+    expect(stmt.handlerName).toBe('mouseUp');
   });
 });
 
 describe('parser — error cases', () => {
-  it('throws on unknown command', () => {
-    expect(() => parse('on h\n  sort\nend h')).toThrow(NecroTalkError);
+  it('rejects sort with the steering message', () => {
+    expect(() => parse('on h\n  sort\nend h')).toThrow('Line 2: Unknown command "sort". NecroTalk does not support sort.');
+  });
+
+  it('rejects do with the steering message', () => {
+    expect(() => parse('on h\n  do "beep"\nend h')).toThrow('Line 2: "do" is not allowed in NecroTalk.');
   });
 
   it('throws on missing end if', () => {
@@ -449,10 +453,14 @@ describe('printer — unary and chunk parenthesization', () => {
 // ---------------------------------------------------------------------------
 
 // Identifiers: [A-Za-z_][A-Za-z0-9_]*, not a keyword. Stored lowercased in the AST.
-const identArb: fc.Arbitrary<string> = fc
+// Names exactly as written: [A-Za-z_][A-Za-z0-9_]*, not a reserved word.
+// Handler, call, pass and exit names keep their case in the AST.
+const nameArb: fc.Arbitrary<string> = fc
   .stringMatching(/^[A-Za-z_][A-Za-z0-9_]{0,7}$/)
-  .filter(s => !KEYWORDS.has(s.toLowerCase()))
-  .map(s => s.toLowerCase());
+  .filter(s => !KEYWORDS.has(s.toLowerCase()));
+
+// Variable names are stored lowercased in the AST.
+const identArb: fc.Arbitrary<string> = nameArb.map(s => s.toLowerCase());
 
 // String literals: Unicode graphemes, excluding `"`, `\n`, `\r` (no escapes in NecroTalk).
 const safeStrArb: fc.Arbitrary<string> = fc
@@ -480,22 +488,17 @@ const allBinaryOps: BinaryOp[] = [
   'and', 'or', '&', '&&',
 ];
 
-// ObjectRef: every type; names are string literals or variables (what the parser produces).
-const refNameArb: fc.Arbitrary<ExpressionNode> = fc.oneof(
-  safeStrArb.map(v => ({ kind: 'literal' as const, value: v })),
-  variableArb,
-);
-const objRefArb: fc.Arbitrary<ObjectRef> = fc.oneof(
-  fc.record({ type: fc.constantFrom('button' as const, 'field' as const, 'image' as const), name: refNameArb }),
-  fc.record({
-    type: fc.constantFrom('card' as const, 'background' as const, 'stack' as const),
-    name: safeStrArb.map(v => ({ kind: 'literal' as const, value: v })),
-  }),
-  fc.constantFrom<ObjectRef>({ type: 'card' }, { type: 'background' }, { type: 'stack' }, { type: 'me' }),
-);
-
-// Recursive expression arbitrary covering all eight expression kinds.
-const { expr: exprArb } = fc.letrec<{ expr: ExpressionNode }>(tie => ({
+// Recursive expression + object-reference arbitraries covering all nine expression
+// kinds. Object names are any expression, so refs and expressions are mutually recursive.
+const { expr: exprArb, objRef: objRefArb } = fc.letrec<{ expr: ExpressionNode; objRef: ObjectRef }>(tie => ({
+  objRef: fc.oneof(
+    { depthSize: 'small', withCrossShrink: true },
+    fc.constant<ObjectRef>({ type: 'me' }),
+    fc.record({
+      type: fc.constantFrom('button' as const, 'field' as const, 'image' as const, 'card' as const),
+      name: tie('expr'),
+    }),
+  ),
   expr: fc.oneof(
     { depthSize: 'small', withCrossShrink: true },
     literalArb,
@@ -514,7 +517,7 @@ const { expr: exprArb } = fc.letrec<{ expr: ExpressionNode }>(tie => ({
     }),
     fc.oneof(
       identArb.map(property => ({ kind: 'property' as const, property })),
-      fc.record({ kind: fc.constant('property' as const), property: identArb, object: objRefArb }),
+      fc.record({ kind: fc.constant('property' as const), property: identArb, object: tie('objRef') }),
     ),
     fc.record({
       kind: fc.constant('chunk' as const),
@@ -530,12 +533,13 @@ const { expr: exprArb } = fc.letrec<{ expr: ExpressionNode }>(tie => ({
         source: tie('expr'),
       }),
     ),
+    tie('expr').map(name => ({ kind: 'field' as const, ref: { type: 'field' as const, name } })),
   ),
-})) as { expr: fc.Arbitrary<ExpressionNode> };
+})) as { expr: fc.Arbitrary<ExpressionNode>; objRef: fc.Arbitrary<ObjectRef> };
 
 // Containers: field containers always use a type:'field' ObjectRef.
 const containerArb: fc.Arbitrary<ContainerNode> = fc.oneof(
-  refNameArb.map(name => ({ kind: 'field' as const, ref: { type: 'field' as const, name } })),
+  exprArb.map(name => ({ kind: 'field' as const, ref: { type: 'field' as const, name } })),
   identArb.map(name => ({ kind: 'variable' as const, name })),
   fc.constant({ kind: 'it' as const }),
 );
@@ -575,10 +579,17 @@ const simpleStmts: fc.Arbitrary<StatementNode>[] = [
   fc.record({ kind: fc.constantFrom('show' as const, 'hide' as const), object: objRefArb, line: fc.constant(0) }),
   fc.oneof(
     fc.constant<StatementNode>({ kind: 'exit', target: 'repeat', line: 0 }),
-    identArb.map<StatementNode>(target => ({ kind: 'exit', target, line: 0 })),
+    nameArb.map<StatementNode>(target => ({ kind: 'exit', target, line: 0 })),
   ),
   fc.constant<StatementNode>({ kind: 'nextRepeat', line: 0 }),
-  identArb.map<StatementNode>(handlerName => ({ kind: 'pass', handlerName, line: 0 })),
+  nameArb.map<StatementNode>(handlerName => ({ kind: 'pass', handlerName, line: 0 })),
+  fc.record({
+    kind: fc.constant('call' as const),
+    // `do` and `sort` are rejected by the parser as out-of-scope commands
+    name: nameArb.filter(n => !['do', 'sort'].includes(n.toLowerCase())),
+    args: fc.array(exprArb, { maxLength: 3 }),
+    line: fc.constant(0),
+  }),
 ];
 const simpleStmtArb: fc.Arbitrary<StatementNode> = fc.oneof(...simpleStmts);
 
@@ -609,7 +620,7 @@ const scriptArb: fc.Arbitrary<ScriptNode> = fc.record({
   handlers: fc.array(
     fc.record({
       kind: fc.constant('handler' as const),
-      name: identArb,
+      name: nameArb,
       params: fc.array(identArb, { maxLength: 3 }),
       body: fc.array(stmtArb, { minLength: 1, maxLength: 5 }),
     }),
@@ -626,5 +637,216 @@ describe('PBT — parse → print → parse round-trip', () => {
       }),
       { numRuns: 200 },
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: custom handler calls and else-if chains (necrotalk-reviewer findings)
+// ---------------------------------------------------------------------------
+
+describe('regression — custom handler call statements', () => {
+  it('parses a bare call', () => {
+    const stmt = firstStmt('on h\n  checkAnswer\nend h');
+    expect(stmt).toEqual({ kind: 'call', name: 'checkAnswer', args: [], line: 2 });
+  });
+
+  it('parses a call with comma-separated args', () => {
+    const stmt = firstStmt('on h\n  addScore 10, "bonus", x + 1\nend h');
+    expect(stmt.kind).toBe('call');
+    if (stmt.kind === 'call') {
+      expect(stmt.args).toHaveLength(3);
+      expect(stmt.args[2]).toMatchObject({ kind: 'binary', op: '+' });
+    }
+  });
+
+  it('round-trips a call through the printer', () => {
+    const script = parse('on h\n  addScore 10, "bonus"\nend h\n');
+    expect(stripPositions(parse(print(script)))).toEqual(stripPositions(script));
+  });
+});
+
+describe('regression — single-line else if inside a multi-line block', () => {
+  it('requires the outer end if', () => {
+    // Before the fix, the single-line `else if` ended the block early and the
+    // missing `end if` was accepted.
+    const src = 'on h\n  if a then\n    beep\n  else if b then beep\nend h';
+    expect(() => parse(src)).toThrow(NecroTalkError);
+  });
+
+  it('accepts the block when end if is present', () => {
+    const src = 'on h\n  if a then\n    beep\n  else if b then beep\n  end if\n  beep\nend h';
+    const h = parseOne(src);
+    expect(h.body).toHaveLength(2);
+    const outer = h.body[0] as IfStatement;
+    expect(outer.elseBranch).toHaveLength(1);
+    const inner = outer.elseBranch![0] as IfStatement;
+    expect(inner.kind).toBe('if');
+    expect(inner.thenBranch).toEqual([{ kind: 'beep', line: 4 }]);
+    expect(h.body[1].kind).toBe('beep');
+  });
+
+  it('supports a further else after a single-line else if', () => {
+    const src = 'on h\n  if a then\n    beep\n  else if b then beep\n  else\n    beep\n  end if\nend h';
+    const outer = parseOne(src).body[0] as IfStatement;
+    const inner = outer.elseBranch![0] as IfStatement;
+    expect(inner.elseBranch).toEqual([{ kind: 'beep', line: 6 }]);
+  });
+
+  it('a standalone single-line if still needs no end if', () => {
+    const h = parseOne('on h\n  if a then beep\n  beep\nend h');
+    expect(h.body).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: second necrotalk-reviewer pass
+// ---------------------------------------------------------------------------
+
+describe('regression — set [the] <property>', () => {
+  it('parses set with the optional "the"', () => {
+    const withThe = firstStmt('on h\n  set the visible of button "OK" to true\nend h') as SetStatement;
+    const without = firstStmt('on h\n  set visible of button "OK" to true\nend h') as SetStatement;
+    expect(withThe).toEqual(without);
+    expect(withThe.property).toBe('visible');
+  });
+});
+
+describe('regression — field reads in expressions', () => {
+  it('parses field "Score" + 1 as (field "Score") + 1', () => {
+    const stmt = firstStmt('on h\n  put field "Score" + 1 into field "Score"\nend h') as PutStatement;
+    expect(stmt.value).toEqual({
+      kind: 'binary', op: '+',
+      left: { kind: 'field', ref: { type: 'field', name: { kind: 'literal', value: 'Score' } } },
+      right: { kind: 'literal', value: 1 },
+    });
+  });
+
+  it('field reads work as chunk sources and conditions', () => {
+    const stmt = firstStmt('on h\n  if word 1 of field "A" is "x" then beep\nend h') as IfStatement;
+    expect(stmt.condition).toMatchObject({ kind: 'binary', op: 'is', left: { kind: 'chunk', source: { kind: 'field' } } });
+  });
+
+  it('round-trips a field read with a compound name', () => {
+    const script = parse('on h\n  get field ("A" & n) & "!"\nend h\n');
+    expect(stripPositions(parse(print(script)))).toEqual(stripPositions(script));
+  });
+});
+
+describe('regression — object reference restrictions', () => {
+  it('a variable is a valid object name', () => {
+    const stmt = firstStmt('on h\n  show button x\nend h') as ShowStatement;
+    expect(stmt.object).toEqual({ type: 'button', name: { kind: 'variable', name: 'x' } });
+  });
+
+  it('background and stack references are parse errors', () => {
+    expect(() => parse('on h\n  show background "B"\nend h'))
+      .toThrow('Line 2: "background" references are not supported in NecroTalk.');
+    expect(() => parse('on h\n  put the name of stack "S" into x\nend h'))
+      .toThrow('Line 2: "stack" references are not supported in NecroTalk.');
+  });
+
+  it('nameless references other than me are parse errors', () => {
+    expect(() => parse('on h\n  hide field\nend h'))
+      .toThrow('Line 2: Expected a name after "field" but found end of line.');
+    expect(() => parse('on h\n  set visible of card to false\nend h'))
+      .toThrow('Line 2: Expected a name after "card" but found "to".');
+  });
+
+  it('me takes no name', () => {
+    expect(firstStmt('on h\n  hide me\nend h')).toEqual({ kind: 'hide', object: { type: 'me' }, line: 2 });
+    expect(() => parse('on h\n  hide me "x"\nend h')).toThrow(NecroTalkError);
+  });
+});
+
+describe('regression — answer button limit', () => {
+  it('accepts three buttons', () => {
+    const stmt = firstStmt('on h\n  answer "?" with "A" or "B" or "C"\nend h') as AnswerStatement;
+    expect(stmt.buttons).toEqual(['A', 'B', 'C']);
+  });
+
+  it('rejects a fourth button', () => {
+    expect(() => parse('on h\n  answer "?" with "A" or "B" or "C" or "D"\nend h'))
+      .toThrow('Line 2: "answer" accepts at most three buttons.');
+  });
+});
+
+describe('regression — reserved words cannot be names', () => {
+  const cases: [string, string][] = [
+    ['put target', 'on h\n  put 1 into card\nend h'],
+    ['handler name', 'on next\n  beep\nend next'],
+    ['parameter', 'on h number\n  beep\nend h'],
+    ['global', 'on h\n  global line\nend h'],
+    ['repeat with', 'on h\n  repeat with word = 1 to 2\n    beep\n  end repeat\nend h'],
+    ['pass target', 'on h\n  pass field\nend h'],
+  ];
+  for (const [label, src] of cases) {
+    it(`rejects a reserved word as a ${label}`, () => {
+      expect(() => parse(src)).toThrow(/is a reserved word\.$/);
+    });
+  }
+
+  it('names the word in the message', () => {
+    expect(() => parse('on h\n  put 1 into card\nend h')).toThrow('Line 2: "card" is a reserved word.');
+  });
+});
+
+describe('regression — error message wording', () => {
+  it('a newline in a "found" clause reads "end of line"', () => {
+    expect(() => parse('on h\n  go to\nend h')).toThrow('Line 2: Expected "card" but found end of line.');
+  });
+
+  it('end of input in a "found" clause reads "end of script"', () => {
+    expect(() => parse('on h\n  put 1 into'))
+      .toThrow('Line 2: Expected a container (field, variable, or "it") but found end of script.');
+  });
+
+  it('messages contain no raw line breaks', () => {
+    try {
+      parse('on h\n  put 1\nend h');
+      throw new Error('should have thrown');
+    } catch (e) {
+      expect((e as NecroTalkError).message).not.toMatch(/\n/);
+    }
+  });
+
+  it('handler names keep their original case in messages', () => {
+    expect(() => parse('on mouseUp\n  beep\nend click'))
+      .toThrow('Line 3: Expected "end mouseUp" but found "end click".');
+  });
+
+  it('handler name matching stays case-insensitive', () => {
+    expect(parseOne('on mouseUp\n  beep\nEND MOUSEUP').name).toBe('mouseUp');
+  });
+});
+
+describe('regression — third reviewer pass: end-of-line / end-of-script wording', () => {
+  it('unknown visual effect at end of line', () => {
+    expect(() => parse('on h\n  visual effect\nend h'))
+      .toThrow('Line 2: Unknown visual effect end of line.');
+  });
+
+  it('unknown visual effect names the word', () => {
+    expect(() => parse('on h\n  visual effect zoom\nend h'))
+      .toThrow('Line 2: Unknown visual effect "zoom".');
+  });
+
+  it('missing end if at end of input reads "end of script"', () => {
+    expect(() => parse('on h\n  if a then\n    beep'))
+      .toThrow('Expected "end if" but found end of script.');
+  });
+
+  it('missing end repeat at end of input reads "end of script"', () => {
+    expect(() => parse('on h\n  repeat 2 times\n    beep'))
+      .toThrow('Expected "end repeat" but found end of script.');
+  });
+});
+
+describe('regression — fifth reviewer pass: reserved word read as a value', () => {
+  it('put left into x reports a reserved word', () => {
+    expect(() => parse('on h\n  put left into x\nend h')).toThrow('Line 2: "left" is a reserved word.');
+  });
+
+  it('get number reports a reserved word', () => {
+    expect(() => parse('on h\n  get number\nend h')).toThrow('Line 2: "number" is a reserved word.');
   });
 });

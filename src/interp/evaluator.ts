@@ -1,13 +1,24 @@
 import { NecroTalkError, formatError } from './errors.js';
 import { resolveNavigation } from './navigation.js';
 import type {
-  ScriptNode, StatementNode, ExpressionNode,
+  ScriptNode, HandlerNode, StatementNode, ExpressionNode,
   BinaryOp, ContainerNode, ObjectRef,
 } from './ast.js';
 
 // ---------------------------------------------------------------------------
 // Host interface
 // ---------------------------------------------------------------------------
+
+/**
+ * An object reference as the host sees it: the name has been evaluated to a
+ * string and `me` has been replaced by the object whose script is running.
+ * `background` and `stack` never come from script references (the parser
+ * rejects them); they appear only when `me` is a background or stack.
+ */
+export interface ResolvedObjectRef {
+  type: 'button' | 'field' | 'image' | 'card' | 'background' | 'stack';
+  name: string;
+}
 
 export interface HostInterface {
   // Navigation — async; receives resolved 0-based index
@@ -24,16 +35,16 @@ export interface HostInterface {
   ask(prompt: string, defaultValue: string): Promise<string>;
 
   // Object visibility — synchronous
-  showObject(ref: ObjectRef): void;
-  hideObject(ref: ObjectRef): void;
+  showObject(ref: ResolvedObjectRef): void;
+  hideObject(ref: ResolvedObjectRef): void;
 
   // Property get/set — synchronous
-  getProperty(ref: ObjectRef, property: string): string;
-  setProperty(ref: ObjectRef, property: string, value: string): void;
+  getProperty(ref: ResolvedObjectRef, property: string): string;
+  setProperty(ref: ResolvedObjectRef, property: string, value: string): void;
 
   // Field access — synchronous
-  getFieldText(ref: ObjectRef): string;
-  setFieldText(ref: ObjectRef, text: string): void;
+  getFieldText(ref: ResolvedObjectRef): string;
+  setFieldText(ref: ResolvedObjectRef, text: string): void;
 
   // Feedback — synchronous
   beep(): void;
@@ -44,8 +55,19 @@ export interface HostInterface {
   random(n: number): number;
 }
 
+export interface EvaluateOptions {
+  /**
+   * The object whose script is running (`me`). Supplied by dispatchMessage for
+   * each level of the message path. If absent, any use of `me` is a runtime error.
+   */
+  me?: ResolvedObjectRef;
+}
+
 // ---------------------------------------------------------------------------
-// Internal exceptions for control flow
+// Internal exceptions for control flow.
+// These never reach callers of evaluate(): misplaced exit/next/pass statements
+// are turned into NecroTalkError before they are thrown. PassException is the
+// only one that leaves evaluate(), and dispatchMessage consumes it.
 // ---------------------------------------------------------------------------
 
 export class ExitHandlerException {
@@ -61,6 +83,31 @@ export class PassException {
 }
 
 const BUDGET_LIMIT = 100_000;
+const MAX_CALL_DEPTH = 200;
+
+/** Variable scope and host access shared by statement and expression evaluation. */
+interface Scope {
+  locals: Map<string, string>;
+  globalDecls: Set<string>;
+  globals: Map<string, string>;
+  host: HostInterface;
+  me?: ResolvedObjectRef;
+}
+
+/** Per-handler-invocation execution state threaded through executeStatement. */
+interface ExecContext extends Scope {
+  script: ScriptNode;
+  /** Name of the handler currently running, as written in the source. */
+  handlerName: string;
+  /** Shared across nested handler calls so a recursion loop still hits the budget. */
+  budget: { count: number };
+  /** Number of enclosing repeat loops in this handler. */
+  loopDepth: number;
+  /** Nesting depth of custom handler calls. */
+  callDepth: number;
+}
+
+const sameName = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
 // ---------------------------------------------------------------------------
 // Public evaluate entry point
@@ -72,30 +119,50 @@ export async function evaluate(
   args: string[],
   host: HostInterface,
   globals: Map<string, string>,
+  options: EvaluateOptions = {},
 ): Promise<void> {
-  const handler = script.handlers.find(
-    h => h.name.toLowerCase() === handlerName.toLowerCase(),
-  );
+  const handler = findHandler(script, handlerName);
   if (!handler) return;
+  await runHandler(handler, script, args, host, globals, options.me, { count: 0 }, 0);
+}
 
-  const locals = new Map<string, string>();
-  const globalDecls = new Set<string>();
+function findHandler(script: ScriptNode, name: string): HandlerNode | undefined {
+  return script.handlers.find(h => sameName(h.name, name));
+}
 
+async function runHandler(
+  handler: HandlerNode,
+  script: ScriptNode,
+  args: string[],
+  host: HostInterface,
+  globals: Map<string, string>,
+  me: ResolvedObjectRef | undefined,
+  budget: { count: number },
+  callDepth: number,
+): Promise<void> {
+  const ctx: ExecContext = {
+    script,
+    handlerName: handler.name,
+    locals: new Map<string, string>(),
+    globalDecls: new Set<string>(),
+    globals,
+    host,
+    me,
+    budget,
+    loopDepth: 0,
+    callDepth,
+  };
   for (let i = 0; i < handler.params.length; i++) {
-    locals.set(handler.params[i].toLowerCase(), args[i] ?? '');
+    ctx.locals.set(handler.params[i].toLowerCase(), args[i] ?? '');
   }
-
-  const budget = { count: 0 };
 
   try {
     for (const stmt of handler.body) {
-      await executeStatement(stmt, locals, globalDecls, globals, host, budget);
+      await executeStatement(stmt, ctx);
     }
   } catch (e) {
-    if (e instanceof ExitHandlerException) {
-      if (e.handlerName.toLowerCase() === handlerName.toLowerCase()) return;
-      throw e;
-    }
+    // executeStatement only throws ExitHandlerException for this handler's own name
+    if (e instanceof ExitHandlerException) return;
     throw e;
   }
 }
@@ -104,20 +171,45 @@ export async function evaluate(
 // Statement execution
 // ---------------------------------------------------------------------------
 
-async function executeStatement(
-  stmt: StatementNode,
-  locals: Map<string, string>,
-  globalDecls: Set<string>,
-  globals: Map<string, string>,
-  host: HostInterface,
-  budget: { count: number },
-): Promise<void> {
-  budget.count++;
-  if (budget.count > BUDGET_LIMIT) {
-    throw new NecroTalkError(
-      formatError(stmt.line, 1, 'Script ran too long'),
-      stmt.line, 1,
-    );
+function runtimeError(line: number, msg: string): NecroTalkError {
+  return new NecroTalkError(formatError(line, 1, msg), line, 1);
+}
+
+/** Resolve a script object reference: evaluate its name, or substitute `me`. */
+function resolveRef(ref: ObjectRef, scope: Scope, line: number): ResolvedObjectRef {
+  if (ref.type === 'me') {
+    if (!scope.me) throw runtimeError(line, '"me" is not available here');
+    return scope.me;
+  }
+  return { type: ref.type, name: evaluateExpression(ref.name, scope, line) };
+}
+
+async function executeBlock(stmts: StatementNode[], ctx: ExecContext): Promise<void> {
+  for (const s of stmts) await executeStatement(s, ctx);
+}
+
+/** Run one loop iteration; returns 'break' when the body executed `exit repeat`. */
+async function runLoopBody(body: StatementNode[], ctx: ExecContext): Promise<'continue' | 'break'> {
+  ctx.loopDepth++;
+  try {
+    await executeBlock(body, ctx);
+    return 'continue';
+  } catch (e) {
+    if (e instanceof ExitRepeatException) return 'break';
+    if (e instanceof NextRepeatException) return 'continue';
+    throw e;
+  } finally {
+    ctx.loopDepth--;
+  }
+}
+
+async function executeStatement(stmt: StatementNode, ctx: ExecContext): Promise<void> {
+  const { globalDecls, globals, host } = ctx;
+  const evalExpr = (e: ExpressionNode) => evaluateExpression(e, ctx, stmt.line);
+
+  ctx.budget.count++;
+  if (ctx.budget.count > BUDGET_LIMIT) {
+    throw runtimeError(stmt.line, 'Script ran too long');
   }
 
   switch (stmt.kind) {
@@ -126,10 +218,9 @@ async function executeStatement(
       return;
 
     case 'go': {
-      const currentIndex = host.getCurrentCardIndex();
-      const cardCount = host.getCardCount();
-      const cardNames = host.getCardNames();
-      const resolved = resolveNavigation(stmt.target, currentIndex, cardCount, cardNames, stmt.line);
+      const resolved = resolveNavigation(
+        stmt.target, host.getCurrentCardIndex(), host.getCardCount(), host.getCardNames(), stmt.line,
+      );
       await host.goToCard(resolved);
       return;
     }
@@ -138,142 +229,120 @@ async function executeStatement(
       await host.setVisualEffect(stmt.effect);
       return;
 
-    case 'put': {
-      const value = evaluateExpression(stmt.value, locals, globalDecls, globals, host, stmt.line);
-      writeContainer(stmt.target, stmt.mode, value, locals, globalDecls, globals, host);
+    case 'put':
+      writeContainer(stmt.target, stmt.mode, evalExpr(stmt.value), ctx, stmt.line);
       return;
-    }
 
-    case 'get': {
-      const value = evaluateExpression(stmt.value, locals, globalDecls, globals, host, stmt.line);
-      writeVar('it', value, locals, globalDecls, globals);
+    case 'get':
+      writeVar('it', evalExpr(stmt.value), ctx);
       return;
-    }
 
     case 'set': {
-      const value = evaluateExpression(stmt.value, locals, globalDecls, globals, host, stmt.line);
-      host.setProperty(stmt.object, stmt.property, value);
+      const ref = resolveRef(stmt.object, ctx, stmt.line);
+      host.setProperty(ref, stmt.property, evalExpr(stmt.value));
       return;
     }
 
     case 'global': {
-      const key = stmt.varName.toLowerCase();
-      globalDecls.add(key);
-      // if local already has this, migrate to globals
-      if (locals.has(key)) {
-        globals.set(key, locals.get(key)!);
-        locals.delete(key);
-      }
+      // From here on, reads and writes of this name in this handler go to the
+      // stack-wide variable. A same-named local is shadowed, never copied over it.
+      globalDecls.add(stmt.varName.toLowerCase());
       return;
     }
 
     case 'answer': {
-      const prompt = evaluateExpression(stmt.prompt, locals, globalDecls, globals, host, stmt.line);
-      const result = await host.answer(prompt, stmt.buttons);
-      writeVar('it', result, locals, globalDecls, globals);
+      const result = await host.answer(evalExpr(stmt.prompt), stmt.buttons);
+      writeVar('it', result, ctx);
       return;
     }
 
     case 'ask': {
-      const prompt = evaluateExpression(stmt.prompt, locals, globalDecls, globals, host, stmt.line);
-      const def = stmt.default
-        ? evaluateExpression(stmt.default, locals, globalDecls, globals, host, stmt.line)
-        : '';
+      const prompt = evalExpr(stmt.prompt);
+      const def = stmt.default ? evalExpr(stmt.default) : '';
       const result = await host.ask(prompt, def);
-      writeVar('it', result, locals, globalDecls, globals);
+      writeVar('it', result, ctx);
       return;
     }
 
     case 'show':
-      host.showObject(stmt.object);
+      host.showObject(resolveRef(stmt.object, ctx, stmt.line));
       return;
 
     case 'hide':
-      host.hideObject(stmt.object);
+      host.hideObject(resolveRef(stmt.object, ctx, stmt.line));
       return;
 
     case 'if': {
-      const cond = evaluateExpression(stmt.condition, locals, globalDecls, globals, host, stmt.line);
-      const branch = isTruthy(cond) ? stmt.thenBranch : (stmt.elseBranch ?? []);
-      for (const s of branch) {
-        await executeStatement(s, locals, globalDecls, globals, host, budget);
-      }
+      const branch = isTruthy(evalExpr(stmt.condition)) ? stmt.thenBranch : (stmt.elseBranch ?? []);
+      await executeBlock(branch, ctx);
       return;
     }
 
     case 'repeat': {
       const v = stmt.variant;
       if (v.type === 'times') {
-        const n = toNumber(
-          evaluateExpression(v.count, locals, globalDecls, globals, host, stmt.line),
-          stmt.line,
-        );
-        for (let i = 0; i < Math.floor(n); i++) {
-          try {
-            for (const s of stmt.body) {
-              await executeStatement(s, locals, globalDecls, globals, host, budget);
-            }
-          } catch (e) {
-            if (e instanceof ExitRepeatException) break;
-            if (e instanceof NextRepeatException) continue;
-            throw e;
-          }
+        const n = Math.floor(toNumber(evalExpr(v.count), stmt.line));
+        for (let i = 0; i < n; i++) {
+          if (await runLoopBody(stmt.body, ctx) === 'break') break;
         }
       } else if (v.type === 'with') {
-        const from = toNumber(
-          evaluateExpression(v.from, locals, globalDecls, globals, host, stmt.line),
-          stmt.line,
-        );
-        const to = toNumber(
-          evaluateExpression(v.to, locals, globalDecls, globals, host, stmt.line),
-          stmt.line,
-        );
+        const from = toNumber(evalExpr(v.from), stmt.line);
+        const to = toNumber(evalExpr(v.to), stmt.line);
         for (let i = from; i <= to; i++) {
-          writeVar(v.varName, String(i), locals, globalDecls, globals);
-          try {
-            for (const s of stmt.body) {
-              await executeStatement(s, locals, globalDecls, globals, host, budget);
-            }
-          } catch (e) {
-            if (e instanceof ExitRepeatException) break;
-            if (e instanceof NextRepeatException) continue;
-            throw e;
-          }
+          writeVar(v.varName, String(i), ctx);
+          if (await runLoopBody(stmt.body, ctx) === 'break') break;
         }
       } else {
-        // while
-        while (true) {
-          const cond = evaluateExpression(v.condition, locals, globalDecls, globals, host, stmt.line);
-          if (!isTruthy(cond)) break;
-          try {
-            for (const s of stmt.body) {
-              await executeStatement(s, locals, globalDecls, globals, host, budget);
-            }
-          } catch (e) {
-            if (e instanceof ExitRepeatException) break;
-            if (e instanceof NextRepeatException) continue;
-            throw e;
-          }
+        while (isTruthy(evalExpr(v.condition))) {
+          if (await runLoopBody(stmt.body, ctx) === 'break') break;
         }
       }
       return;
     }
 
-    case 'exit':
-      if (stmt.target === 'repeat') throw new ExitRepeatException();
+    case 'exit': {
+      if (stmt.target === 'repeat') {
+        if (ctx.loopDepth === 0) throw runtimeError(stmt.line, '"exit repeat" can only be used inside a repeat loop');
+        throw new ExitRepeatException();
+      }
+      if (!sameName(stmt.target, ctx.handlerName)) {
+        throw runtimeError(stmt.line,
+          `"exit ${stmt.target}" does not match the running handler "${ctx.handlerName}"`);
+      }
       throw new ExitHandlerException(stmt.target);
+    }
 
     case 'nextRepeat':
+      if (ctx.loopDepth === 0) throw runtimeError(stmt.line, '"next repeat" can only be used inside a repeat loop');
       throw new NextRepeatException();
 
     case 'pass':
+      if (!sameName(stmt.handlerName, ctx.handlerName)) {
+        throw runtimeError(stmt.line,
+          `"pass ${stmt.handlerName}" does not match the running handler "${ctx.handlerName}"`);
+      }
       throw new PassException(stmt.handlerName);
 
+    case 'call': {
+      const target = findHandler(ctx.script, stmt.name);
+      if (!target) throw runtimeError(stmt.line, `Unknown command "${stmt.name}"`);
+      if (ctx.callDepth >= MAX_CALL_DEPTH) {
+        throw runtimeError(stmt.line, `Too many nested handler calls (more than ${MAX_CALL_DEPTH})`);
+      }
+      const args = stmt.args.map(evalExpr);
+      try {
+        // Same script, so the called handler runs with the same `me`
+        await runHandler(target, ctx.script, args, host, globals, ctx.me, ctx.budget, ctx.callDepth + 1);
+      } catch (e) {
+        // A directly called handler has no further message path, so `pass` just ends it.
+        if (e instanceof PassException) return;
+        throw e;
+      }
+      return;
+    }
+
     default:
-      throw new NecroTalkError(
-        formatError((stmt as StatementNode).line, 1, `Unknown statement kind "${(stmt as StatementNode).kind}"`),
-        (stmt as StatementNode).line, 1,
-      );
+      throw runtimeError((stmt as StatementNode).line, 'Internal error, unsupported statement');
   }
 }
 
@@ -281,21 +350,28 @@ async function executeStatement(
 // Variable read/write helpers
 // ---------------------------------------------------------------------------
 
-function readVar(key: string, locals: Map<string, string>, globalDecls: Set<string>, globals: Map<string, string>): string {
+/**
+ * The stored value of a variable, or undefined if it has never been set.
+ * Stack-wide globals are visible only in handlers that declared them with `global`.
+ */
+function storedVar(key: string, scope: Scope): string | undefined {
   const k = key.toLowerCase();
-  if (k === 'it') return locals.get('it') ?? '';
-  if (globalDecls.has(k)) return globals.get(k) ?? '';
-  if (locals.has(k)) return locals.get(k)!;
-  if (globals.has(k)) return globals.get(k)!;
-  return k; // HyperCard: unset variable evaluates to its own name
+  if (k === 'it') return scope.locals.get('it') ?? '';
+  if (scope.globalDecls.has(k)) return scope.globals.get(k) ?? '';
+  return scope.locals.get(k);
 }
 
-function writeVar(key: string, value: string, locals: Map<string, string>, globalDecls: Set<string>, globals: Map<string, string>): void {
+/** Read a variable in an expression. HyperCard: an unset variable evaluates to its own name. */
+function readVar(key: string, scope: Scope): string {
+  return storedVar(key, scope) ?? key.toLowerCase();
+}
+
+function writeVar(key: string, value: string, scope: Scope): void {
   const k = key.toLowerCase();
-  if (globalDecls.has(k)) {
-    globals.set(k, value);
+  if (scope.globalDecls.has(k)) {
+    scope.globals.set(k, value);
   } else {
-    locals.set(k, value);
+    scope.locals.set(k, value);
   }
 }
 
@@ -303,27 +379,22 @@ function writeContainer(
   container: ContainerNode,
   mode: 'into' | 'before' | 'after',
   value: string,
-  locals: Map<string, string>,
-  globalDecls: Set<string>,
-  globals: Map<string, string>,
-  host: HostInterface,
+  scope: Scope,
+  line: number,
 ): void {
   if (container.kind === 'it') {
-    const current = locals.get('it') ?? '';
-    const result = applyMode(current, value, mode);
-    locals.set('it', result);
+    scope.locals.set('it', applyMode(scope.locals.get('it') ?? '', value, mode));
     return;
   }
   if (container.kind === 'variable') {
-    const current = readVar(container.name, locals, globalDecls, globals);
-    const result = applyMode(current, value, mode);
-    writeVar(container.name, result, locals, globalDecls, globals);
+    // As a put target, an unset variable starts out empty (not its own name)
+    const current = storedVar(container.name, scope) ?? '';
+    writeVar(container.name, applyMode(current, value, mode), scope);
     return;
   }
   // field container
-  const current = host.getFieldText(container.ref);
-  const result = applyMode(current, value, mode);
-  host.setFieldText(container.ref, result);
+  const ref = resolveRef(container.ref, scope, line);
+  scope.host.setFieldText(ref, applyMode(scope.host.getFieldText(ref), value, mode));
 }
 
 function applyMode(current: string, value: string, mode: 'into' | 'before' | 'after'): string {
@@ -336,67 +407,55 @@ function applyMode(current: string, value: string, mode: 'into' | 'before' | 'af
 // Expression evaluation
 // ---------------------------------------------------------------------------
 
-export function evaluateExpression(
-  expr: ExpressionNode,
-  locals: Map<string, string>,
-  globalDecls: Set<string>,
-  globals: Map<string, string>,
-  host: HostInterface,
-  currentLine: number,
-): string {
+function evaluateExpression(expr: ExpressionNode, scope: Scope, currentLine: number): string {
+  const ev = (e: ExpressionNode) => evaluateExpression(e, scope, currentLine);
+  const { host } = scope;
+
   switch (expr.kind) {
     case 'literal':
       if (typeof expr.value === 'boolean') return expr.value ? 'true' : 'false';
       return String(expr.value);
 
     case 'variable':
-      return readVar(expr.name, locals, globalDecls, globals);
+      return readVar(expr.name, scope);
 
-    case 'binary': {
-      const left = evaluateExpression(expr.left, locals, globalDecls, globals, host, currentLine);
-      const right = evaluateExpression(expr.right, locals, globalDecls, globals, host, currentLine);
-      return evaluateBinaryOp(expr.op, left, right, currentLine);
-    }
+    case 'binary':
+      return evaluateBinaryOp(expr.op, ev(expr.left), ev(expr.right), currentLine);
 
     case 'unary': {
-      const val = evaluateExpression(expr.operand, locals, globalDecls, globals, host, currentLine);
+      const val = ev(expr.operand);
       if (expr.op === 'not') return isTruthy(val) ? 'false' : 'true';
-      const n = toNumber(val, currentLine);
-      return String(-n);
+      return String(-toNumber(val, currentLine));
     }
 
-    case 'functionCall': {
-      const args = expr.args.map(a => evaluateExpression(a, locals, globalDecls, globals, host, currentLine));
-      return callFunction(expr.name, args, host, currentLine);
-    }
+    case 'functionCall':
+      return callFunction(expr.name, expr.args.map(ev), host, currentLine);
+
+    case 'field':
+      return host.getFieldText(resolveRef(expr.ref, scope, currentLine));
 
     case 'property': {
-      if (expr.property === 'date') return host.getDate();
-      if (expr.property === 'time') return host.getTime();
-      if (expr.object) return host.getProperty(expr.object, expr.property);
-      return host.getProperty({ type: 'stack' }, expr.property);
+      if (expr.object) return host.getProperty(resolveRef(expr.object, scope, currentLine), expr.property);
+      // Bare `the <name>` is valid only for `the date` and `the time`
+      const prop = expr.property.toLowerCase();
+      if (prop === 'date') return host.getDate();
+      if (prop === 'time') return host.getTime();
+      throw runtimeError(currentLine, `Unknown property "${expr.property}"`);
     }
 
     case 'chunk': {
-      const src = evaluateExpression(expr.source, locals, globalDecls, globals, host, currentLine);
-      const idx = Math.floor(toNumber(
-        evaluateExpression(expr.index, locals, globalDecls, globals, host, currentLine),
-        currentLine,
-      ));
+      const src = ev(expr.source);
+      const idx = Math.floor(toNumber(ev(expr.index), currentLine));
       return getChunk(expr.chunkType, idx, src);
     }
 
     case 'count': {
       if (expr.what === 'cards') return String(host.getCardCount());
-      const src = evaluateExpression(expr.source!, locals, globalDecls, globals, host, currentLine);
-      return String(countChunks(expr.what, src));
+      return String(countChunks(expr.what, ev(expr.source!)));
     }
 
     default:
-      throw new NecroTalkError(
-        formatError(currentLine, 1, `Unknown expression kind "${(expr as ExpressionNode).kind}"`),
-        currentLine, 1,
-      );
+      throw runtimeError(currentLine, 'Internal error, unsupported expression');
   }
 }
 
@@ -441,20 +500,19 @@ function numericOrStringCompare(a: string, b: string): number {
 // Built-in functions
 // ---------------------------------------------------------------------------
 
+/** Built-in functions and their exact argument counts. A Map, so names like
+ *  "constructor" are not found on Object.prototype. */
+const FUNCTION_ARITY = new Map<string, number>([['random', 1], ['length', 1]]);
+
 function callFunction(name: string, args: string[], host: HostInterface, line: number): string {
-  switch (name.toLowerCase()) {
-    case 'random': {
-      const n = toNumber(args[0] ?? '1', line);
-      return String(host.random(Math.floor(n)));
-    }
-    case 'length':
-      return String((args[0] ?? '').length);
-    default:
-      throw new NecroTalkError(
-        formatError(line, 1, `Unknown function "${name}"`),
-        line, 1,
-      );
+  const key = name.toLowerCase();
+  const arity = FUNCTION_ARITY.get(key);
+  if (arity === undefined) throw runtimeError(line, `Unknown function "${name}"`);
+  if (args.length !== arity) {
+    throw runtimeError(line, `${name} expects ${arity} argument${arity === 1 ? '' : 's'}`);
   }
+  if (key === 'random') return String(host.random(Math.floor(toNumber(args[0], line))));
+  return String(args[0].length); // length
 }
 
 function getChunk(type: 'word' | 'line' | 'char', index: number, source: string): string {
@@ -481,15 +539,18 @@ function countChunks(what: 'words' | 'lines' | 'chars', source: string): number 
 // Coercion helpers
 // ---------------------------------------------------------------------------
 
+/** Quote a runtime value for an error message: one line, at most 40 characters. */
+function quoteValue(value: string): string {
+  const oneLine = value.replace(/\r\n|\r|\n/g, ' ');
+  return `"${oneLine.length > 40 ? oneLine.slice(0, 40) + '…' : oneLine}"`;
+}
+
 function toNumber(value: string, line: number): number {
   if (value === 'true') return 1;
   if (value === 'false') return 0;
   const n = parseFloat(value);
   if (isNaN(n)) {
-    throw new NecroTalkError(
-      formatError(line, 1, `Expected a number but got "${value}"`),
-      line, 1,
-    );
+    throw runtimeError(line, `Expected a number but got ${quoteValue(value)}`);
   }
   return n;
 }

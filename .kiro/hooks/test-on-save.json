@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Run tests on src save",
+      "trigger": "PostFileSave",
+      "description": "Runs the Vitest suite whenever a file under src/ is saved.",
+      "matcher": "(^|[\\\\/])src[\\\\/]",
+      "action": {
+        "type": "command",
+        "command": "npm test",
+        "timeout": 180
+      }
+    }
+  ]
+}
