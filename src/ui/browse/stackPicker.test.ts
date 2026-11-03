@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
-import { createStackPicker, fixtureFromSearch, FIXTURES, urlWithFixture } from './stackPicker.js';
+import { createStackPicker, fixtureFromSearch, FIXTURES, UNTITLED, urlWithFixture } from './stackPicker.js';
 import { loadFixture } from '../../model/fixtures.js';
 
 describe('stack picker', () => {
@@ -40,5 +40,22 @@ describe('stack picker', () => {
   it('urlWithFixture sets the parameter and keeps the rest', () => {
     expect(urlWithFixture('http://localhost:5173/?x=1#top', 'flashcards'))
       .toBe('http://localhost:5173/?x=1&stack=flashcards#top');
+  });
+});
+
+describe('stack picker: Untitled entry (edit-mode REQ-1.5)', () => {
+  it('showUntitled adds and selects one Untitled option; choosing a fixture removes it', () => {
+    const onChange = vi.fn();
+    const picker = createStackPicker(onChange);
+    picker.showUntitled();
+    picker.showUntitled();
+    const values = () => Array.from(picker.select.options).map(o => o.value);
+    expect(values()).toEqual(['quiz', 'adventure', 'flashcards', UNTITLED]);
+    expect(picker.select.value).toBe(UNTITLED);
+    expect(picker.select.selectedOptions[0].textContent).toBe('Untitled');
+    picker.select.dispatchEvent(new Event('change'));
+    expect(onChange).not.toHaveBeenCalled(); // re-selecting Untitled loads nothing
+    picker.setValue('adventure');
+    expect(values()).toEqual(['quiz', 'adventure', 'flashcards']);
   });
 });

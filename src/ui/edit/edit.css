@@ -1,0 +1,301 @@
+/* NecroCard edit mode.
+   Part 1: on the card surface — strictly 1-bit (#000 / #fff), no gradients, shadows, opacity or transitions.
+   Part 2: chrome (inspector, edit toolbar, card menu) — chrome rules, never inherited by .card-surface. */
+
+:root {
+  --z-edit-overlay: 50;
+}
+
+/* ------------------------------------------------------------------ card surface (1-bit) */
+
+.card-surface[data-mode="edit"] {
+  cursor: default;
+}
+
+.card-surface[data-mode="edit"]:focus-visible {
+  outline: 1px dotted #000000;
+  outline-offset: 2px;
+}
+
+.card-surface .edit-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-edit-overlay);
+  background: transparent;
+  touch-action: none;
+}
+
+.card-surface .edit-hidden-layer,
+.card-surface .edit-selection {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.card-surface .edit-selection[hidden] {
+  display: none;
+}
+
+.card-surface .edit-hidden-outline {
+  position: absolute;
+  border: 1px dotted #000000;
+  background: transparent;
+}
+
+.card-surface .edit-outline {
+  position: absolute;
+  overflow: visible;
+}
+
+.card-surface .edit-handle {
+  position: absolute;
+  background: #000000;
+  pointer-events: auto;
+}
+
+.card-surface .edit-handle--nwse { cursor: nwse-resize; }
+.card-surface .edit-handle--nesw { cursor: nesw-resize; }
+.card-surface .edit-handle--ns { cursor: ns-resize; }
+.card-surface .edit-handle--ew { cursor: ew-resize; }
+
+/* ------------------------------------------------------------------ chrome (inspector, toolbar, menu) */
+
+.inspector {
+  flex: 0 0 240px;
+  width: 240px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  padding: 8px 10px 16px;
+  border-left: 1px solid #c8c8c8;
+  background: var(--chrome-bg);
+  color: var(--chrome-fg);
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.inspector section + section {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #c8c8c8;
+}
+
+.inspector-heading,
+.inspector-subheading {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+
+.inspector-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.inspector-row--checkbox {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.inspector-row--checkbox label {
+  order: 2;
+}
+
+.inspector-row--info {
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.inspector-info-label {
+  color: var(--chrome-muted);
+}
+
+.inspector-rect {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.inspector-input,
+.inspector-script {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 2px 4px;
+  border: 1px solid #8a8a8a;
+  background: #ffffff;
+  color: #000000;
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.inspector-input--number {
+  text-align: right;
+}
+
+.inspector-input:read-only {
+  color: var(--chrome-muted);
+  background: #f7f7f7;
+}
+
+.inspector-script {
+  font-family: var(--font-script);
+  resize: vertical;
+  white-space: pre;
+}
+
+.inspector-note,
+.inspector-script-status {
+  min-height: 0;
+  color: var(--chrome-muted);
+  font-size: 11px;
+}
+
+.inspector-note:empty {
+  display: none;
+}
+
+.inspector-note--warning,
+.inspector-script-status--error {
+  color: #8a1010;
+}
+
+.inspector :focus-visible,
+.edit-toolbar :focus-visible,
+.chrome-toolbar :focus-visible {
+  outline: 2px solid #1a1a1a;
+  outline-offset: 1px;
+}
+
+.chrome-button {
+  padding: 2px 8px;
+  border: 1px solid #8a8a8a;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #1a1a1a;
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.chrome-button:disabled,
+.chrome-button[aria-disabled="true"] {
+  color: var(--chrome-muted);
+  background: #f7f7f7;
+}
+
+.edit-toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-bottom: 1px solid #c8c8c8;
+  background: var(--chrome-bg);
+}
+
+.edit-toolbar-spacer {
+  flex: 1 1 auto;
+}
+
+.card-menu {
+  position: relative;
+}
+
+.card-menu-list {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  z-index: 100;
+  min-width: 140px;
+  margin: 0;
+  padding: 2px 0;
+  list-style: none;
+  border: 1px solid #1a1a1a;
+  background: #ffffff;
+  box-shadow: 2px 2px 0 #1a1a1a;
+}
+
+.card-menu-list[hidden] {
+  display: none;
+}
+
+.card-menu-item {
+  display: block;
+  width: 100%;
+  padding: 3px 12px;
+  border: 0;
+  background: transparent;
+  color: #1a1a1a;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  text-align: left;
+}
+
+.card-menu-item:hover,
+.card-menu-item:focus-visible {
+  background: #1a1a1a;
+  color: #ffffff;
+  outline: none;
+}
+
+.card-menu-item[aria-disabled="true"] {
+  color: var(--chrome-muted);
+  background: transparent;
+}
+
+.mode-toggle {
+  display: inline-flex;
+}
+
+.mode-toggle-option {
+  border-radius: 0;
+}
+
+.mode-toggle-option:first-child {
+  border-radius: 3px 0 0 3px;
+}
+
+.mode-toggle-option:last-child {
+  border-left: 0;
+  border-radius: 0 3px 3px 0;
+}
+
+.mode-toggle-option--on {
+  background: #1a1a1a;
+  color: #ffffff;
+}
+
+.card-info-dialog {
+  min-width: 240px;
+  padding: 12px 16px;
+  border: 1px solid #1a1a1a;
+  background: #ffffff;
+  color: #1a1a1a;
+  font-size: 12px;
+}
+
+.card-info-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+
+.card-info-dialog input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 2px 0 8px;
+}
+
+.card-info-dialog p {
+  margin: 2px 0;
+}
+
+.card-info-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}

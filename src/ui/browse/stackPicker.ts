@@ -29,9 +29,14 @@ export function urlWithFixture(href: string, key: FixtureName): string {
 export interface StackPicker {
   el: HTMLElement;
   select: HTMLSelectElement;
-  setValue(key: FixtureName): void;
+  setValue(key: FixtureName | typeof UNTITLED): void;
   setDisabled(disabled: boolean): void;
+  /** Add (if missing) and select an "Untitled" entry for a new stack (edit-mode REQ-1.5). */
+  showUntitled(): void;
 }
+
+/** Picker value for a stack made with New Stack. */
+export const UNTITLED = 'untitled';
 
 /** A labelled <select> of the bundled stacks. `onChange` receives the chosen fixture key. */
 export function createStackPicker(onChange: (key: FixtureName) => void): StackPicker {
@@ -46,6 +51,18 @@ export function createStackPicker(onChange: (key: FixtureName) => void): StackPi
     option.textContent = f.name;
     select.append(option);
   }
+  const untitled = () => select.querySelector<HTMLOptionElement>(`option[value="${UNTITLED}"]`);
+  const setValue = (key: FixtureName | typeof UNTITLED) => {
+    if (key === UNTITLED && !untitled()) {
+      const option = document.createElement('option');
+      option.value = UNTITLED;
+      option.textContent = 'Untitled';
+      select.append(option);
+    } else if (key !== UNTITLED) {
+      untitled()?.remove(); // a fixture was chosen: the new stack is gone (no persistence)
+    }
+    select.value = key;
+  };
   select.addEventListener('change', () => {
     if (isFixture(select.value)) onChange(select.value);
   });
@@ -53,7 +70,8 @@ export function createStackPicker(onChange: (key: FixtureName) => void): StackPi
   return {
     el: label,
     select,
-    setValue: key => { select.value = key; },
+    setValue,
     setDisabled: disabled => { select.disabled = disabled; },
+    showUntitled: () => setValue(UNTITLED),
   };
 }

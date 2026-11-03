@@ -219,3 +219,31 @@ describe('DomHost dialogs and built-ins', () => {
     expect(beeps()).toBe(1);
   });
 });
+
+describe('DomHost edit mode hooks', () => {
+  it('showCard renders another card without messages and keeps the pending effect', async () => {
+    const { host, log, stage, state, el } = setup();
+    await host.setVisualEffect('dissolve');
+    host.showCard(2);
+    expect(log).toEqual([]);
+    expect(state.cardIndex).toBe(2);
+    expect(stage.surface.dataset.cardIndex).toBe('2');
+    expect(stage.surface.dataset.cardName).toBe('Three');
+    expect(el('Banner')!.textContent).toBe('other bg');
+    expect(state.pendingEffect).toBe('dissolve');
+    expect(() => host.showCard(3)).toThrow('Card index 4 is out of range');
+  });
+
+  it('rerender re-renders the current card from the working copy without messages', () => {
+    const { host, log, state, el, stage } = setup();
+    const go = state.stack.cards[0].objects[0];
+    if (go.type === 'button') go.label = 'Edited';
+    go.rect = { x: 1, y: 2, w: 3, h: 4 };
+    host.rerender();
+    expect(log).toEqual([]);
+    expect(el('Go')!.textContent).toBe('Edited');
+    expect(el('Go')!.style.left).toBe('1px');
+    expect(host.elementFor(go.id)).toBe(el('Go'));
+    expect(stage.surface.querySelectorAll('.card-layer').length).toBe(1);
+  });
+});

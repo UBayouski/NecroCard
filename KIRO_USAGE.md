@@ -290,3 +290,76 @@ What changed: A broken script in browse mode now reports `Script error in button
 the brief, the steering and the spec are the contract, and the agent checks the code against all three. One side
 effect documented rather than hidden: with implicit globals, a parameter called without an argument sets that global
 to empty.
+
+## 2026-11-03 — Spec 4: edit-mode (requirements, design, tasks)
+Surface: CLI (Auto)
+Features: spec, steering, pbt, mcp
+What I asked for: An edit-mode spec from BRIEF sections 3 and 5 and the retro-ui edit affordances: Browse/Edit
+toggle, selection with outline and handles, move, resize, nudge, a 240 px inspector with a plain script textarea,
+add tools, 1-bit image import, delete, a card menu, one linear undo/redo, all on the same working copy browse mode
+runs, with three property tests and a Playwright e2e.
+What Kiro did: About 955 lines across the three files and fourteen open decisions with defaults. The design choice
+I would not have asked for but agree with: undo stores commands (target ids plus before and after values) rather
+than stack snapshots, because a snapshot undo after a Browse session would also wipe what scripts changed. It
+noticed that serializeStack sorts keys, so only array order matters for byte-exact undo, and had add/delete restore
+the exact index. All edit operations go through one class with no DOM access, so the undo and redo property tests
+run in Node with validateStack after every step. Image import needs no library: a hand-written 1-bit PNG encoder
+with stored deflate blocks, reusing the Bayer matrix from the browse-mode dissolve. Clicks in edit mode are kept
+away from scripts by two guards, an inert card layer and a runtime mode check.
+What changed: Thirteen defaults accepted; the image fit size raised from 128 to 256; the drag-ghost line in retro-ui
+reworded so the steering does not contradict a live-move drag. One gap found in review: there was no way to create
+a stack from scratch, only to edit the three fixtures, which the demo and the later Summon and sharing specs both
+need. Added a New Stack action and an editable stack name as one more undoable command.
+
+## 2026-11-03 — Spec 4: edit-mode, end-to-end and Playwright MCP (task 11)
+Surface: CLI (Auto)
+Features: spec, mcp, pbt
+What I asked for: Run the edit-mode e2e tests, then drive the add-button flow once through Playwright MCP with a
+selection screenshot and a result screenshot, check the console, and log it here.
+What Kiro did: Wrote test/e2e/edit.spec.ts with three tests: on the quiz, add a button whose script is `go next`,
+switch to Browse, click it, land on Q1; import a local image (generated with the project's own PNG encoder, so no
+fixture file) and check it comes back as a 1-bit grayscale PNG data URL with no request leaving the dev server; New
+Stack, add a button that renames itself, click it in Browse, see "Clicked". All five e2e tests (two browse, three
+edit) passed on the first run.
+Playwright MCP run against http://localhost:5173/?stack=quiz: browser_navigate, click the Edit radio, click
+"Add button", browser_take_screenshot, browser_type the script into the inspector's Script textarea, click the
+Browse radio, click "Button 1", read data-card-name with browser_evaluate. Result: Title → Q1, status line empty,
+runtime not busy. Screenshots: .playwright-mcp/edit-mode-selection.png (Button 1 at 206,159 100×24 with its eight
+handles and the button inspector) and .playwright-mcp/edit-mode-result.png (the Q1 card in Browse). Console: Vite's
+connect/connected debug lines only, 0 errors, 0 warnings (the favicon 404 from the browse-mode run is gone).
+What changed: Two things went wrong during the MCP run and are worth recording. First, the first selection
+screenshot showed no selection: the undo history held eight moves and resizes of Button 1, TitleField and
+BeginButton that Kiro had not made. The MCP browser is a visible window, and each entry needs a real press-and-drag
+on the card, so the likely cause is someone interacting with that window between Kiro's calls; Kiro could not
+confirm this. It read the history by stepping back through the Undo titles, and that turned into a live check of the
+undo requirement: undoing all nine edits restored TitleField to its fixture size and removed Button 1, and redoing
+all nine replayed them exactly. It then reloaded and repeated the flow. Second, on the retry Kiro sent dependent
+browser steps in parallel; the "Add button" click raced the mode switch and the screenshot captured the wrong
+state. It noticed, said so, and redid the steps one at a time. Lesson for MCP runs: one dependent action per call,
+and verify state with browser_evaluate before each screenshot. A small visual finding from the screenshot: the
+selection's dashed outline sits exactly on a button's own 2px black border, so the handles are what make a selected
+bordered button visible; worth a look in retro-skin.
+
+## 2026-11-03 — Spec 4 executed (tasks 1 to 12): edit mode complete
+Surface: CLI (Auto)
+Features: spec, hook, pbt, mcp
+What I asked for: Apply the five review changes to the spec, run Tasks 1 to 10, stop and report; then, with the dev
+server running, Tasks 11 and 12 including the Playwright MCP run of the add-button flow.
+What Kiro did: 559 Vitest tests in 36 files (120 new) and 5 e2e tests, all green with typecheck, lint and build.
+The undo and redo property tests run 200 cases on each fixture, stack rename included. It reported seven
+deviations, all improvements: keyboard editing only when the card has focus (otherwise arrow keys in the mode
+toggle would nudge the selection), no Tab-to-indent in the script textarea because it would trap keyboard users,
+pointer and key handling split into its own file to stay under 300 lines. Two test failures during the build were
+mistakes in its own tests, not the code, and it said so: one test held a reference across delete and undo, but undo
+restores a copy by design so history never aliases the working copy; another expected the card not to receive a
+new button's mouseDown, but message passing correctly hands it up. Typecheck failed once on Node's Buffer in a
+test; it fixed the test rather than add @types/node. The MCP run drove the full flow: Edit, Add button, script in
+the inspector, Browse, click, card Title to Q1. Two screenshots, copies committed in docs/screenshots/.
+What changed: Two incidents during the MCP run, both logged by Kiro. First, the undo history showed eight moves and
+resizes it had not made; the MCP browser is a visible window and a human was using it between calls (I had
+suggested trying edit mode at that address). Kiro undid them, saw the quiz return exactly to the fixture, redid
+them, and treated it as a live check of the byte-exact undo requirement before reloading. Second, it sent dependent
+MCP steps in parallel, "Add button" ran before edit mode was ready, and a screenshot captured the wrong state; it
+redid the flow one step at a time, checking state before each screenshot. One visual note carried to retro-skin:
+the dashed selection outline sits on top of a roundRect button's 2 px border, so only the handles show selection.
+Interpreter and model untouched, no new dependencies.

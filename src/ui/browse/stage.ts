@@ -24,6 +24,7 @@ export class CardStage {
     this.surface.dataset.cardIndex = '0';
     this.surface.dataset.cardName = '';
     this.surface.dataset.busy = 'false';
+    this.surface.dataset.mode = 'browse';
     this.frame.append(this.surface);
     this.viewport.append(this.frame);
   }
@@ -75,9 +76,36 @@ export class CardStage {
 
   /** Replace the shown card layer without a transition. */
   setCardLayer(layer: HTMLElement): void {
+    if (this.editing) layer.inert = true;
     const old = this.cardLayer;
     if (old) old.replaceWith(layer);
     else this.surface.prepend(layer);
+  }
+
+  private editing = false;
+
+  /**
+   * Edit mode (edit-mode REQ-1.2): `data-mode`, card layers inert (now and every layer set while
+   * editing), and the surface focusable so it can take keyboard input.
+   */
+  setEditing(on: boolean): void {
+    this.editing = on;
+    this.surface.dataset.mode = on ? 'edit' : 'browse';
+    const layer = this.cardLayer;
+    if (layer) layer.inert = on;
+    if (on) this.surface.tabIndex = 0;
+    else this.surface.removeAttribute('tabindex');
+    if (!on) this.setSelected(null);
+  }
+
+  get isEditing(): boolean {
+    return this.editing;
+  }
+
+  /** `data-selected-id` for the edit-mode selection (absent when nothing is selected). */
+  setSelected(id: string | null): void {
+    if (id === null) delete this.surface.dataset.selectedId;
+    else this.surface.dataset.selectedId = id;
   }
 
   setCard(index: number, name: string): void {

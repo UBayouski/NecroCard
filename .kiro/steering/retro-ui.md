@@ -133,8 +133,9 @@ Cards are DOM. Transitions between cards are stepped DOM effects, not canvas ras
 
 - Selection handles: 4px × 4px solid black squares at the 8 corners and edge midpoints.
 - Selection outline: 1px dashed black, 4px dash, 4px gap.
-- Drag ghost: 50% opacity copy of the object (this is the one allowed opacity exception in edit mode, not
-  on the browse card surface).
+- Drag ghost: a 50% opacity copy of the object is permitted while dragging but not required; moving the real object
+  live is equally acceptable. This is the one allowed opacity exception in edit mode, and never on the browse card
+  surface.
 - Inspector panel: chrome styling (not 1-bit card rules), fixed width 240px, positioned to the right of
   the card.
 

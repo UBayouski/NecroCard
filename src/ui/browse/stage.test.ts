@@ -56,3 +56,40 @@ describe('CardStage', () => {
     expect(stage.surface.contains(overlay)).toBe(true);
   });
 });
+
+describe('CardStage edit mode hooks', () => {
+  const layer = () => Object.assign(document.createElement('div'), { className: 'card-layer' });
+
+  it('setEditing marks the surface, makes the current and every later layer inert, and back', () => {
+    const stage = new CardStage();
+    expect(stage.surface.dataset.mode).toBe('browse');
+    const a = layer();
+    stage.setCardLayer(a);
+    stage.setEditing(true);
+    expect(stage.surface.dataset.mode).toBe('edit');
+    expect(stage.isEditing).toBe(true);
+    expect(stage.surface.tabIndex).toBe(0);
+    expect(a.inert).toBe(true);
+    const b = layer();
+    stage.setCardLayer(b);
+    expect(b.inert).toBe(true);
+    stage.setEditing(false);
+    expect(b.inert).toBe(false);
+    expect(stage.surface.hasAttribute('tabindex')).toBe(false);
+    const c = layer();
+    stage.setCardLayer(c);
+    expect(c.inert).toBe(false);
+  });
+
+  it('setSelected sets and clears data-selected-id; leaving edit mode clears it', () => {
+    const stage = new CardStage();
+    stage.setEditing(true);
+    stage.setSelected('abc1234567');
+    expect(stage.surface.dataset.selectedId).toBe('abc1234567');
+    stage.setSelected(null);
+    expect('selectedId' in stage.surface.dataset).toBe(false);
+    stage.setSelected('abc1234567');
+    stage.setEditing(false);
+    expect('selectedId' in stage.surface.dataset).toBe(false);
+  });
+});

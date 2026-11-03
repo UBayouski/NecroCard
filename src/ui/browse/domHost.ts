@@ -63,6 +63,31 @@ export class DomHost implements HostInterface {
     this.publishCard();
   }
 
+  /**
+   * Show a card without messages or a transition (edit mode navigation). The pending visual
+   * effect is left alone.
+   */
+  showCard(index: number): void {
+    const count = this.state.stack.cards.length;
+    if (!Number.isInteger(index) || index < 0 || index >= count) {
+      throw new Error(`Card index ${index + 1} is out of range`);
+    }
+    this.state.cardIndex = index;
+    this.rerender();
+  }
+
+  /** Re-render the current card from the working copy (after edits). */
+  rerender(): void {
+    this.current = this.render(this.state.cardIndex);
+    this.stage.setCardLayer(this.current.layer);
+    this.publishCard();
+  }
+
+  /** The element rendered for an object on the current card, if any. */
+  elementFor(objectId: string): HTMLElement | undefined {
+    return this.current?.elements.get(objectId);
+  }
+
   // ---------------------------------------------------------------- navigation
 
   async goToCard(index: number): Promise<void> {
@@ -112,11 +137,11 @@ export class DomHost implements HostInterface {
   // ---------------------------------------------------------------- objects
 
   showObject(ref: ResolvedObjectRef): void {
-    this.refresh(setVisibility(this.state.stack, this.state.cardIndex, ref, true));
+    this.updateObject(setVisibility(this.state.stack, this.state.cardIndex, ref, true));
   }
 
   hideObject(ref: ResolvedObjectRef): void {
-    this.refresh(setVisibility(this.state.stack, this.state.cardIndex, ref, false));
+    this.updateObject(setVisibility(this.state.stack, this.state.cardIndex, ref, false));
   }
 
   getProperty(ref: ResolvedObjectRef, property: string): string {
@@ -124,7 +149,7 @@ export class DomHost implements HostInterface {
   }
 
   setProperty(ref: ResolvedObjectRef, property: string, value: string): void {
-    this.refresh(setProp(findObject(this.state.stack, this.state.cardIndex, ref), property, value));
+    this.updateObject(setProp(findObject(this.state.stack, this.state.cardIndex, ref), property, value));
   }
 
   getFieldText(ref: ResolvedObjectRef): string {
@@ -134,7 +159,7 @@ export class DomHost implements HostInterface {
   setFieldText(ref: ResolvedObjectRef, text: string): void {
     const f = findField(this.state.stack, this.state.cardIndex, ref);
     f.text = text;
-    this.refresh(f);
+    this.updateObject(f);
   }
 
   // ---------------------------------------------------------------- built-ins
@@ -166,7 +191,8 @@ export class DomHost implements HostInterface {
     });
   }
 
-  private refresh(obj: CardObject): void {
+  /** Re-render one object's element after a script changed it (per-object update, no card re-render). */
+  private updateObject(obj: CardObject): void {
     const el = this.current?.elements.get(obj.id);
     if (el) updateObjectEl(el, obj);
   }

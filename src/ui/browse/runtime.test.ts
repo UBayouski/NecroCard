@@ -233,3 +233,34 @@ describe('BrowseRuntime busy, errors, effects', () => {
     expect(el('Press').textContent).toBe('Press');
   });
 });
+
+describe('BrowseRuntime edit mode hooks', () => {
+  it('in edit mode no gesture or message-box line reaches a script, even with the layer not inert', async () => {
+    const { rt, el, logText, stage } = setup();
+    await rt.load(sampleStack());
+    rt.setMode('edit');
+    expect(rt.currentMode).toBe('edit');
+    expect(stage.cardLayer!.inert).toBe(false); // the stage's inert is a separate guard
+    await clickOn(rt, el('Press'));
+    el('Press').click();
+    await rt.runMessageBox('put "x" after field "Log"');
+    await settle(rt);
+    expect(logText()).toBe('card-os,stack-os,oc1,');
+    rt.setMode('browse');
+    await clickOn(rt, el('Press'));
+    expect(logText()).toBe('card-os,stack-os,oc1,d,u,');
+  });
+
+  it('onLoad runs after openStack/openCard, and load resets the mode to browse', async () => {
+    const stage = new CardStage();
+    document.body.replaceChildren(stage.viewport);
+    const events: string[] = [];
+    const rt = new BrowseRuntime(stage, { show: () => {}, clear: () => {} }, {
+      beep: () => {}, onLoad: () => events.push(`load:${rt.currentMode}`),
+    });
+    await rt.load(sampleStack());
+    rt.setMode('edit');
+    await rt.load(sampleStack());
+    expect(events).toEqual(['load:browse', 'load:browse']);
+  });
+});

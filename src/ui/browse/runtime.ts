@@ -17,6 +17,8 @@ export interface RuntimeOptions extends DomHostOptions {
   onBusyChange?: (busy: boolean) => void;
   /** Run a callback on the next frame (keyboard hilite flash). */
   nextFrame?: (cb: () => void) => void;
+  /** Called after a stack has been loaded and its openStack/openCard have run (edit mode resets). */
+  onLoad?: () => void;
 }
 
 /** What a gesture targets: an object by id, or the bare card. */
@@ -36,6 +38,7 @@ export class BrowseRuntime {
   private state: BrowseState | null = null;
   private host: DomHost | null = null;
   private gesture: Gesture | null = null;
+  private mode: 'browse' | 'edit' = 'browse';
 
   constructor(
     private readonly stage: CardStage,
@@ -53,6 +56,16 @@ export class BrowseRuntime {
   get isBusy(): boolean { return this.state?.busy ?? false; }
   get currentState(): BrowseState | null { return this.state; }
   get currentHost(): DomHost | null { return this.host; }
+  get currentMode(): 'browse' | 'edit' { return this.mode; }
+
+  /**
+   * Browse or edit (edit-mode REQ-1.2). In edit mode no gesture reaches a script, even if the
+   * card layer were not inert. Switching modes sends no messages.
+   */
+  setMode(mode: 'browse' | 'edit'): void {
+    this.mode = mode;
+    if (mode === 'edit') this.endGesture(false);
+  }
 
   /** Load a stack: fresh working copy, render card 1, then openStack and openCard (REQ-5.3). */
   async load(stack: Stack): Promise<boolean> {
@@ -62,19 +75,21 @@ export class BrowseRuntime {
     this.state = state;
     this.host = host;
     this.gesture = null;
+    this.mode = 'browse';
     host.mountInitialCard();
     this.status.clear();
     await this.top(this.label({ kind: 'card' }), async () => {
       await this.dispatch('openStack', { kind: 'card' });
       await this.dispatch('openCard', { kind: 'card' });
     });
+    this.options.onLoad?.();
     return true;
   }
 
-  /** Run one message-box statement (REQ-7). */
+  /** Run one message-box statement (REQ-7). Not available in edit mode. */
   async runMessageBox(line: string): Promise<void> {
     const { state, host } = this;
-    if (!state || !host) return;
+    if (!state || !host || this.mode === 'edit') return;
     await this.top('Message box', () => runMessageBoxLine(line, host, state.globals));
   }
 
@@ -152,7 +167,7 @@ export class BrowseRuntime {
   }
 
   private onPointerDown(e: PointerEvent): void {
-    if (e.button !== 0 || this.isBusy || this.gesture) return;
+    if (e.button !== 0 || this.isBusy || this.gesture || this.mode === 'edit') return;
     const hit = this.targetOf(e.target);
     if (!hit || !this.state) return;
     const state = this.state;
@@ -206,7 +221,7 @@ export class BrowseRuntime {
 
   /** Keyboard activation (Enter/Space) of a focused button: mouseDown then mouseUp (REQ-5.2). */
   private onClick(e: MouseEvent): void {
-    if (e.detail !== 0 || this.isBusy || this.gesture) return;
+    if (e.detail !== 0 || this.isBusy || this.gesture || this.mode === 'edit') return;
     const hit = this.targetOf(e.target);
     if (!hit || hit.target.kind !== 'object' || !hit.el?.classList.contains('button') || !this.state) return;
     const state = this.state;
