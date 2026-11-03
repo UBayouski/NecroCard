@@ -1,0 +1,236 @@
+{
+  "id": "qz_stack01",
+  "name": "The Haunted Quiz",
+  "backgrounds": [
+    {
+      "id": "qz_bg0001",
+      "name": "Default",
+      "objects": [],
+      "script": ""
+    }
+  ],
+  "cards": [
+    {
+      "id": "qz_cd0001",
+      "name": "Title",
+      "backgroundId": "qz_bg0001",
+      "objects": [
+        {
+          "id": "qz_ob0001",
+          "name": "TitleField",
+          "type": "field",
+          "rect": { "x": 56, "y": 60, "w": 400, "h": 80 },
+          "visible": true,
+          "script": "",
+          "text": "The Haunted Quiz\n\nDare you answer?",
+          "lockText": true,
+          "style": "transparent"
+        },
+        {
+          "id": "qz_ob0002",
+          "name": "BeginButton",
+          "type": "button",
+          "rect": { "x": 196, "y": 270, "w": 120, "h": 30 },
+          "visible": true,
+          "script": "on mouseUp\n  go to card \"Q1\"\nend mouseUp",
+          "style": "roundRect",
+          "label": "Enter if you dare...",
+          "autoHilite": true
+        }
+      ],
+      "script": ""
+    },
+    {
+      "id": "qz_cd0002",
+      "name": "Q1",
+      "backgroundId": "qz_bg0001",
+      "objects": [
+        {
+          "id": "qz_ob0003",
+          "name": "QuestionField",
+          "type": "field",
+          "rect": { "x": 32, "y": 30, "w": 448, "h": 60 },
+          "visible": true,
+          "script": "",
+          "text": "Q1: What creature rises from the dead to walk the night?",
+          "lockText": true,
+          "style": "transparent"
+        },
+        {
+          "id": "qz_ob0004",
+          "name": "AnswerA",
+          "type": "button",
+          "rect": { "x": 80, "y": 120, "w": 352, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  go to card \"Q2\"\nend mouseUp",
+          "style": "rect",
+          "label": "A) A zombie",
+          "autoHilite": true
+        },
+        {
+          "id": "qz_ob0005",
+          "name": "AnswerB",
+          "type": "button",
+          "rect": { "x": 80, "y": 160, "w": 352, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  go to card \"Q2\"\nend mouseUp",
+          "style": "rect",
+          "label": "B) A vampire",
+          "autoHilite": true
+        },
+        {
+          "id": "qz_ob0006",
+          "name": "AnswerC",
+          "type": "button",
+          "rect": { "x": 80, "y": 200, "w": 352, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  go to card \"Q2\"\nend mouseUp",
+          "style": "rect",
+          "label": "C) A garden gnome",
+          "autoHilite": true
+        }
+      ],
+      "script": ""
+    },
+    {
+      "id": "qz_cd0003",
+      "name": "Q2",
+      "backgroundId": "qz_bg0001",
+      "objects": [
+        {
+          "id": "qz_ob0007",
+          "name": "QuestionField",
+          "type": "field",
+          "rect": { "x": 32, "y": 30, "w": 448, "h": 60 },
+          "visible": true,
+          "script": "",
+          "text": "Q2: Which month is cursed with the most hauntings?",
+          "lockText": true,
+          "style": "transparent"
+        },
+        {
+          "id": "qz_ob0008",
+          "name": "AnswerA",
+          "type": "button",
+          "rect": { "x": 80, "y": 120, "w": 352, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  go to card \"Q3\"\nend mouseUp",
+          "style": "rect",
+          "label": "A) July",
+          "autoHilite": true
+        },
+        {
+          "id": "qz_ob0009",
+          "name": "AnswerB",
+          "type": "button",
+          "rect": { "x": 80, "y": 160, "w": 352, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  go to card \"Q3\"\nend mouseUp",
+          "style": "rect",
+          "label": "B) October",
+          "autoHilite": true
+        },
+        {
+          "id": "qz_ob0010",
+          "name": "AnswerC",
+          "type": "button",
+          "rect": { "x": 80, "y": 200, "w": 352, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  go to card \"Q3\"\nend mouseUp",
+          "style": "rect",
+          "label": "C) February",
+          "autoHilite": true
+        }
+      ],
+      "script": ""
+    },
+    {
+      "id": "qz_cd0004",
+      "name": "Q3",
+      "backgroundId": "qz_bg0001",
+      "objects": [
+        {
+          "id": "qz_ob0011",
+          "name": "QuestionField",
+          "type": "field",
+          "rect": { "x": 32, "y": 30, "w": 448, "h": 60 },
+          "visible": true,
+          "script": "",
+          "text": "Q3: What do you leave on the doorstep to appease restless spirits?",
+          "lockText": true,
+          "style": "transparent"
+        },
+        {
+          "id": "qz_ob0012",
+          "name": "AnswerA",
+          "type": "button",
+          "rect": { "x": 80, "y": 120, "w": 352, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  go to card \"Results\"\nend mouseUp",
+          "style": "rect",
+          "label": "A) A bowl of candy",
+          "autoHilite": true
+        },
+        {
+          "id": "qz_ob0013",
+          "name": "AnswerB",
+          "type": "button",
+          "rect": { "x": 80, "y": 160, "w": 352, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  go to card \"Results\"\nend mouseUp",
+          "style": "rect",
+          "label": "B) A lit jack-o-lantern",
+          "autoHilite": true
+        },
+        {
+          "id": "qz_ob0014",
+          "name": "AnswerC",
+          "type": "button",
+          "rect": { "x": 80, "y": 200, "w": 352, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  go to card \"Results\"\nend mouseUp",
+          "style": "rect",
+          "label": "C) Your accountant",
+          "autoHilite": true
+        }
+      ],
+      "script": ""
+    },
+    {
+      "id": "qz_cd0005",
+      "name": "Results",
+      "backgroundId": "qz_bg0001",
+      "objects": [
+        {
+          "id": "qz_ob0015",
+          "name": "ResultField",
+          "type": "field",
+          "rect": { "x": 56, "y": 80, "w": 400, "h": 120 },
+          "visible": true,
+          "script": "",
+          "text": "You survived the Haunted Quiz!\n\nWhether your answers were right or wrong,\nthe spirits are satisfied.",
+          "lockText": true,
+          "style": "transparent"
+        },
+        {
+          "id": "qz_ob0016",
+          "name": "RestartButton",
+          "type": "button",
+          "rect": { "x": 196, "y": 270, "w": 120, "h": 30 },
+          "visible": true,
+          "script": "on mouseUp\n  go to card \"Title\"\nend mouseUp",
+          "style": "roundRect",
+          "label": "Try Again",
+          "autoHilite": true
+        }
+      ],
+      "script": ""
+    }
+  ],
+  "script": "",
+  "metadata": {
+    "author": "NecroCard",
+    "created": "2026-11-03T14:00:00.000Z",
+    "modified": "2026-11-03T14:00:00.000Z"
+  }
+}

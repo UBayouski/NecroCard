@@ -1,0 +1,1 @@
+// NecroCard entry point

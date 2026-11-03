@@ -1,0 +1,332 @@
+{
+  "id": "fc_stack01",
+  "name": "Spooky Flashcards",
+  "backgrounds": [
+    {
+      "id": "fc_bg0001",
+      "name": "Default",
+      "objects": [],
+      "script": ""
+    }
+  ],
+  "cards": [
+    {
+      "id": "fc_cd0001",
+      "name": "Title",
+      "backgroundId": "fc_bg0001",
+      "objects": [
+        {
+          "id": "fc_ob0001",
+          "name": "TitleField",
+          "type": "field",
+          "rect": { "x": 56, "y": 80, "w": 400, "h": 100 },
+          "visible": true,
+          "script": "",
+          "text": "Spooky Flashcards\n\nTest your knowledge of the macabre.",
+          "lockText": true,
+          "style": "transparent"
+        },
+        {
+          "id": "fc_ob0002",
+          "name": "StartButton",
+          "type": "button",
+          "rect": { "x": 196, "y": 270, "w": 120, "h": 30 },
+          "visible": true,
+          "script": "on mouseUp\n  go next\nend mouseUp",
+          "style": "roundRect",
+          "label": "Begin",
+          "autoHilite": true
+        }
+      ],
+      "script": ""
+    },
+    {
+      "id": "fc_cd0002",
+      "name": "Card1",
+      "backgroundId": "fc_bg0001",
+      "objects": [
+        {
+          "id": "fc_ob0003",
+          "name": "Question",
+          "type": "field",
+          "rect": { "x": 32, "y": 40, "w": 448, "h": 80 },
+          "visible": true,
+          "script": "",
+          "text": "What do you call a skeleton who refuses to work?",
+          "lockText": true,
+          "style": "rect"
+        },
+        {
+          "id": "fc_ob0004",
+          "name": "Answer",
+          "type": "field",
+          "rect": { "x": 32, "y": 140, "w": 448, "h": 60 },
+          "visible": false,
+          "script": "",
+          "text": "Lazy bones.",
+          "lockText": true,
+          "style": "rect"
+        },
+        {
+          "id": "fc_ob0005",
+          "name": "FlipButton",
+          "type": "button",
+          "rect": { "x": 32, "y": 218, "w": 100, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  show field \"Answer\"\nend mouseUp",
+          "style": "rect",
+          "label": "Flip",
+          "autoHilite": true
+        },
+        {
+          "id": "fc_ob0006",
+          "name": "PrevButton",
+          "type": "button",
+          "rect": { "x": 32, "y": 270, "w": 100, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  go prev\nend mouseUp",
+          "style": "rect",
+          "label": "< Prev",
+          "autoHilite": true
+        },
+        {
+          "id": "fc_ob0007",
+          "name": "NextButton",
+          "type": "button",
+          "rect": { "x": 380, "y": 270, "w": 100, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  go next\nend mouseUp",
+          "style": "rect",
+          "label": "Next >",
+          "autoHilite": true
+        }
+      ],
+      "script": "on openCard\n  hide field \"Answer\"\nend openCard"
+    },
+    {
+      "id": "fc_cd0003",
+      "name": "Card2",
+      "backgroundId": "fc_bg0001",
+      "objects": [
+        {
+          "id": "fc_ob0008",
+          "name": "Question",
+          "type": "field",
+          "rect": { "x": 32, "y": 40, "w": 448, "h": 80 },
+          "visible": true,
+          "script": "",
+          "text": "What do ghosts put on their bagels?",
+          "lockText": true,
+          "style": "rect"
+        },
+        {
+          "id": "fc_ob0009",
+          "name": "Answer",
+          "type": "field",
+          "rect": { "x": 32, "y": 140, "w": 448, "h": 60 },
+          "visible": false,
+          "script": "",
+          "text": "Scream cheese.",
+          "lockText": true,
+          "style": "rect"
+        },
+        {
+          "id": "fc_ob0010",
+          "name": "FlipButton",
+          "type": "button",
+          "rect": { "x": 32, "y": 218, "w": 100, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  show field \"Answer\"\nend mouseUp",
+          "style": "rect",
+          "label": "Flip",
+          "autoHilite": true
+        },
+        {
+          "id": "fc_ob0011",
+          "name": "PrevButton",
+          "type": "button",
+          "rect": { "x": 32, "y": 270, "w": 100, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  go prev\nend mouseUp",
+          "style": "rect",
+          "label": "< Prev",
+          "autoHilite": true
+        },
+        {
+          "id": "fc_ob0012",
+          "name": "NextButton",
+          "type": "button",
+          "rect": { "x": 380, "y": 270, "w": 100, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  go next\nend mouseUp",
+          "style": "rect",
+          "label": "Next >",
+          "autoHilite": true
+        }
+      ],
+      "script": "on openCard\n  hide field \"Answer\"\nend openCard"
+    },
+    {
+      "id": "fc_cd0004",
+      "name": "Card3",
+      "backgroundId": "fc_bg0001",
+      "objects": [
+        {
+          "id": "fc_ob0013",
+          "name": "Question",
+          "type": "field",
+          "rect": { "x": 32, "y": 40, "w": 448, "h": 80 },
+          "visible": true,
+          "script": "",
+          "text": "Why do vampires use mouthwash?",
+          "lockText": true,
+          "style": "rect"
+        },
+        {
+          "id": "fc_ob0014",
+          "name": "Answer",
+          "type": "field",
+          "rect": { "x": 32, "y": 140, "w": 448, "h": 60 },
+          "visible": false,
+          "script": "",
+          "text": "Because they have bat breath.",
+          "lockText": true,
+          "style": "rect"
+        },
+        {
+          "id": "fc_ob0015",
+          "name": "FlipButton",
+          "type": "button",
+          "rect": { "x": 32, "y": 218, "w": 100, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  show field \"Answer\"\nend mouseUp",
+          "style": "rect",
+          "label": "Flip",
+          "autoHilite": true
+        },
+        {
+          "id": "fc_ob0016",
+          "name": "PrevButton",
+          "type": "button",
+          "rect": { "x": 32, "y": 270, "w": 100, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  go prev\nend mouseUp",
+          "style": "rect",
+          "label": "< Prev",
+          "autoHilite": true
+        },
+        {
+          "id": "fc_ob0017",
+          "name": "NextButton",
+          "type": "button",
+          "rect": { "x": 380, "y": 270, "w": 100, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  go next\nend mouseUp",
+          "style": "rect",
+          "label": "Next >",
+          "autoHilite": true
+        }
+      ],
+      "script": "on openCard\n  hide field \"Answer\"\nend openCard"
+    },
+    {
+      "id": "fc_cd0005",
+      "name": "Card4",
+      "backgroundId": "fc_bg0001",
+      "objects": [
+        {
+          "id": "fc_ob0018",
+          "name": "Question",
+          "type": "field",
+          "rect": { "x": 32, "y": 40, "w": 448, "h": 80 },
+          "visible": true,
+          "script": "",
+          "text": "What is a witch's favourite subject in school?",
+          "lockText": true,
+          "style": "rect"
+        },
+        {
+          "id": "fc_ob0019",
+          "name": "Answer",
+          "type": "field",
+          "rect": { "x": 32, "y": 140, "w": 448, "h": 60 },
+          "visible": false,
+          "script": "",
+          "text": "Spelling.",
+          "lockText": true,
+          "style": "rect"
+        },
+        {
+          "id": "fc_ob0020",
+          "name": "FlipButton",
+          "type": "button",
+          "rect": { "x": 32, "y": 218, "w": 100, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  show field \"Answer\"\nend mouseUp",
+          "style": "rect",
+          "label": "Flip",
+          "autoHilite": true
+        },
+        {
+          "id": "fc_ob0021",
+          "name": "PrevButton",
+          "type": "button",
+          "rect": { "x": 32, "y": 270, "w": 100, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  go prev\nend mouseUp",
+          "style": "rect",
+          "label": "< Prev",
+          "autoHilite": true
+        },
+        {
+          "id": "fc_ob0022",
+          "name": "NextButton",
+          "type": "button",
+          "rect": { "x": 380, "y": 270, "w": 100, "h": 28 },
+          "visible": true,
+          "script": "on mouseUp\n  go next\nend mouseUp",
+          "style": "rect",
+          "label": "Next >",
+          "autoHilite": true
+        }
+      ],
+      "script": "on openCard\n  hide field \"Answer\"\nend openCard"
+    },
+    {
+      "id": "fc_cd0006",
+      "name": "End",
+      "backgroundId": "fc_bg0001",
+      "objects": [
+        {
+          "id": "fc_ob0023",
+          "name": "EndField",
+          "type": "field",
+          "rect": { "x": 56, "y": 80, "w": 400, "h": 100 },
+          "visible": true,
+          "script": "",
+          "text": "You have mastered the spooky arts!\n\nOr at least you laughed at the puns.",
+          "lockText": true,
+          "style": "transparent"
+        },
+        {
+          "id": "fc_ob0024",
+          "name": "RestartButton",
+          "type": "button",
+          "rect": { "x": 196, "y": 270, "w": 120, "h": 30 },
+          "visible": true,
+          "script": "on mouseUp\n  go to card \"Title\"\nend mouseUp",
+          "style": "roundRect",
+          "label": "Start Over",
+          "autoHilite": true
+        }
+      ],
+      "script": ""
+    }
+  ],
+  "script": "",
+  "metadata": {
+    "author": "NecroCard",
+    "created": "2026-11-03T14:00:00.000Z",
+    "modified": "2026-11-03T14:00:00.000Z"
+  }
+}

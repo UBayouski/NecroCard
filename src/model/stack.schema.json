@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://necrocard.app/schemas/stack.json",
+  "title": "Stack",
+  "description": "A NecroCard stack document.",
+  "$ref": "#/$defs/Stack",
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{8,10}$"
+    },
+    "IsoDateTime": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d+Z$"
+    },
+    "Rect": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "integer" },
+        "y": { "type": "integer" },
+        "w": { "type": "integer", "minimum": 0 },
+        "h": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["x", "y", "w", "h"],
+      "additionalProperties": false
+    },
+    "ObjectBase": {
+      "type": "object",
+      "properties": {
+        "id":      { "$ref": "#/$defs/Id" },
+        "name":    { "type": "string" },
+        "rect":    { "$ref": "#/$defs/Rect" },
+        "visible": { "type": "boolean" },
+        "script":  { "type": "string" }
+      },
+      "required": ["id", "name", "rect", "visible", "script"]
+    },
+    "ButtonObject": {
+      "allOf": [{ "$ref": "#/$defs/ObjectBase" }],
+      "properties": {
+        "type":       { "const": "button" },
+        "style":      { "enum": ["rect", "roundRect", "transparent"] },
+        "label":      { "type": "string" },
+        "autoHilite": { "type": "boolean" }
+      },
+      "required": ["type", "style", "label", "autoHilite"],
+      "unevaluatedProperties": false
+    },
+    "FieldObject": {
+      "allOf": [{ "$ref": "#/$defs/ObjectBase" }],
+      "properties": {
+        "type":     { "const": "field" },
+        "text":     { "type": "string" },
+        "lockText": { "type": "boolean" },
+        "style":    { "enum": ["rect", "scrolling", "transparent"] }
+      },
+      "required": ["type", "text", "lockText", "style"],
+      "unevaluatedProperties": false
+    },
+    "ImageObject": {
+      "allOf": [{ "$ref": "#/$defs/ObjectBase" }],
+      "properties": {
+        "type": { "const": "image" },
+        "src":  { "type": "string" }
+      },
+      "required": ["type", "src"],
+      "unevaluatedProperties": false
+    },
+    "CardObject": {
+      "oneOf": [
+        { "$ref": "#/$defs/ButtonObject" },
+        { "$ref": "#/$defs/FieldObject" },
+        { "$ref": "#/$defs/ImageObject" }
+      ]
+    },
+    "Background": {
+      "type": "object",
+      "properties": {
+        "id":      { "$ref": "#/$defs/Id" },
+        "name":    { "type": "string" },
+        "objects": { "type": "array", "items": { "$ref": "#/$defs/CardObject" } },
+        "script":  { "type": "string" }
+      },
+      "required": ["id", "name", "objects", "script"],
+      "additionalProperties": false
+    },
+    "Card": {
+      "type": "object",
+      "properties": {
+        "id":           { "$ref": "#/$defs/Id" },
+        "name":         { "type": "string" },
+        "backgroundId": { "$ref": "#/$defs/Id" },
+        "objects":      { "type": "array", "items": { "$ref": "#/$defs/CardObject" } },
+        "script":       { "type": "string" }
+      },
+      "required": ["id", "name", "backgroundId", "objects", "script"],
+      "additionalProperties": false
+    },
+    "StackMetadata": {
+      "type": "object",
+      "properties": {
+        "created":  { "$ref": "#/$defs/IsoDateTime" },
+        "modified": { "$ref": "#/$defs/IsoDateTime" },
+        "author":   { "type": "string" }
+      },
+      "required": ["created", "modified", "author"],
+      "additionalProperties": false
+    },
+    "Stack": {
+      "type": "object",
+      "properties": {
+        "id":          { "$ref": "#/$defs/Id" },
+        "name":        { "type": "string" },
+        "backgrounds": { "type": "array", "items": { "$ref": "#/$defs/Background" } },
+        "cards":       { "type": "array", "items": { "$ref": "#/$defs/Card" } },
+        "script":      { "type": "string" },
+        "metadata":    { "$ref": "#/$defs/StackMetadata" }
+      },
+      "required": ["id", "name", "backgrounds", "cards", "script", "metadata"],
+      "additionalProperties": false
+    }
+  }
+}
