@@ -1,11 +1,12 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
 import fc from 'fast-check';
-import { remapLine, runMessageBoxLine, wrapStatement, WRAPPER_HANDLER } from './messageBox.js';
+import { LINE_OFFSET, remapLine, runMessageBoxLine, wrapStatement, WRAPPER_HANDLER } from './messageBox.js';
 import { BrowseRuntime } from './runtime.js';
 import { CardStage } from './stage.js';
 import { background, field, makeStack } from './testStacks.js';
 import { NecroTalkError } from '../../interp/errors.js';
+import { KEYWORDS } from '../../interp/tokenizer.js';
 import type { Stack } from '../../model/types.js';
 
 function setup() {
@@ -29,24 +30,18 @@ function threeCards(): Stack {
 }
 
 describe('wrapStatement / remapLine', () => {
-  it('wraps the typed line in a hidden handler', () => {
-    expect(wrapStatement('go next')).toEqual({
-      source: `on ${WRAPPER_HANDLER}\ngo next\nend ${WRAPPER_HANDLER}`, offset: 1, declarations: 0,
-    });
-  });
-
-  it('declares every identifier global first (HyperCard message-box variables are global)', () => {
-    const w = wrapStatement('put Ghost & n into field "Name"');
-    expect(w.source).toBe(`on ${WRAPPER_HANDLER}\nglobal ghost\nglobal n\nput Ghost & n into field "Name"\nend ${WRAPPER_HANDLER}`);
-    expect(w.offset).toBe(3);
-    expect(w.declarations).toBe(2);
+  it('wraps the typed line as line 2 of a hidden handler', () => {
+    expect(wrapStatement('put Ghost & n into field "Name"'))
+      .toBe(`on ${WRAPPER_HANDLER}\nput Ghost & n into field "Name"\nend ${WRAPPER_HANDLER}`);
+    expect(LINE_OFFSET).toBe(1);
   });
 
   it('maps wrapped line numbers back to the typed line', () => {
-    expect(remapLine('Line 2: No card named "X".', 1)).toBe('Line 1: No card named "X".');
-    expect(remapLine('Line 4: Unknown function "foo".', 3)).toBe('Line 1: Unknown function "foo".');
-    expect(remapLine('Line 1: oops.', 1)).toBe('Line 1: oops.');
-    expect(remapLine('No field named "X"', 1)).toBe('No field named "X"');
+    expect(remapLine('Line 2: No card named "X".')).toBe('Line 1: No card named "X".');
+    expect(remapLine('Line 3: Expected "end messageBox" but found end of script.'))
+      .toBe('Line 2: Expected "end messageBox" but found end of script.');
+    expect(remapLine('Line 1: oops.')).toBe('Line 1: oops.');
+    expect(remapLine('No field named "X"')).toBe('No field named "X"');
   });
 });
 
@@ -78,7 +73,7 @@ describe('runMessageBoxLine via the runtime', () => {
     await rt.runMessageBox('hide me');
     expect(messages).toEqual(['Message box: Line 1: "me" is not available here.']);
     await rt.runMessageBox('put field "Nope" into x');
-    expect(messages).toEqual(['Message box: No field named "Nope"']);
+    expect(messages).toEqual(['Message box: Line 1: No field named "Nope".']);
     expect(rt.isBusy).toBe(false);
   });
 
@@ -124,7 +119,13 @@ describe('runMessageBoxLine directly', () => {
     await runMessageBoxLine('put 5 into g', host, globals);
     expect(globals.get('g')).toBe('5');
     await runMessageBoxLine('get 7', host, globals);
-    expect(globals.has('it')).toBe(false); // `it` stays local
+    expect(globals.get('it')).toBe('7'); // `it` is global in the box too, as in HyperCard
+  });
+
+  it('a `global` statement in the box is harmless', async () => {
+    const globals = new Map<string, string>([['g', '1']]);
+    await runMessageBoxLine('global g', host, globals);
+    expect(globals.get('g')).toBe('1');
   });
 
   it('rejects multiple lines and handler structure', async () => {
@@ -138,8 +139,52 @@ describe('runMessageBoxLine directly', () => {
     await expect(runMessageBoxLine('put "oops into x', host, new Map())).rejects.toThrow(/^Line 1: /);
   });
 
-  it('runtime errors after global declarations still report line 1', async () => {
+  it('runtime errors report line 1', async () => {
     await expect(runMessageBoxLine('put foo(x) into y', host, new Map())).rejects.toThrow('Line 1: Unknown function "foo".');
+  });
+
+  it('host errors report line 1', async () => {
+    const h = { ...host, showObject: () => { throw new Error('No button named "Ghost"'); } };
+    await expect(runMessageBoxLine('show button "Ghost"', h, new Map()))
+      .rejects.toThrow('Line 1: No button named "Ghost".');
+  });
+});
+
+describe('PBT: message box globals round-trip through a handler', () => {
+  const value = fc.string({ unit: 'grapheme', maxLength: 20 }).filter(s => !/["\r\n]/.test(s));
+  const name = fc.stringMatching(/^[A-Za-z][A-Za-z0-9_]{0,7}$/)
+    .filter(n => !KEYWORDS.has(n.toLowerCase()) && n.toLowerCase() !== WRAPPER_HANDLER.toLowerCase());
+
+  it('box → handler → box: a value put in the box is read by a handler that declares the global, and back', async () => {
+    await fc.assert(
+      fc.asyncProperty(name, value, value, async (n, fromBox, fromHandler) => {
+        // Card Two's openCard declares the global, copies it into a field, then overwrites it.
+        const stack = makeStack({
+          cards: [
+            { name: 'One', objects: [field('Back', { text: '' })] },
+            {
+              name: 'Two',
+              objects: [field('Seen', { text: '' })],
+              script: `on openCard\n  global ${n}\n  put ${n} into field "Seen"\n  put "${fromHandler}" into ${n}\nend openCard`,
+            },
+          ],
+        });
+        const { rt, stage, messages } = setup();
+        await rt.load(stack);
+        const text = (f: string) => stage.surface.querySelector(`[data-object-name="${f}"]`)!.textContent;
+
+        await rt.runMessageBox(`put "${fromBox}" into ${n}`);
+        await rt.runMessageBox('go next');
+        expect(text('Seen')).toBe(fromBox);
+
+        await rt.runMessageBox('go first');
+        await rt.runMessageBox(`put ${n} into field "Back"`);
+        expect(text('Back')).toBe(fromHandler);
+        expect(rt.currentState!.globals.get(n.toLowerCase())).toBe(fromHandler);
+        expect(messages).toEqual([]);
+      }),
+      { numRuns: 200 },
+    );
   });
 });
 

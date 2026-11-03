@@ -313,8 +313,10 @@ Script error in <type> "<name>": <message>
 where `<type> "<name>"` is the object, card, background or stack that received the message (e.g.
 `Script error in button "AnswerA": Line 2: No card named "Q9".`). The receiver is where the message
 entered the path, not the level whose handler failed; `openStack` and `openCard` on load are received
-by card 1, so load errors read `Script error in card "<card 1 name>": …`. Host errors carry no line number
-in this spec (see design, open question 1). The status line clears on the next successful gesture,
+by card 1, so load errors read `Script error in card "<card 1 name>": …`. `DomHost` errors (REQ-4)
+are plain `Error`s; the evaluator rethrows them as `NecroTalkError`s at the failing statement's line,
+so they read like every other runtime error (`Script error in button "Lost": Line 2: No field named
+"Missing".`). The status line clears on the next successful gesture,
 message-box run, or stack load. The runtime returns to not-busy.
 
 ---
@@ -337,35 +339,24 @@ message-box run, or stack load. The runtime returns to not-busy.
 
 - A single-line text input at the bottom of the window, below the card, class `message-box`,
   `font-script`, accessible name "Message box".
-- Enter runs the line as exactly one NecroTalk statement against the current card, using
-  `evaluate` with the same `DomHost` and the stack's globals. `me` is not available (the evaluator
-  reports `"me" is not available here`).
-- **Globals (interim design).** As in HyperCard, variables used in the message box are global. The
-  evaluator only exposes a global to a handler that declares it, and a one-statement box cannot
-  declare and use a variable in the same line, so the line is wrapped as:
-
-  ```
-  on messageBox
-  global <id1>          -- one line per distinct identifier token in the typed line, lowercased
-  global <id2>
-  <typed line>
-  end messageBox
-  ```
-
-  Identifiers that turn out to be property, function or handler names are harmless. `it` is a
-  keyword, so it is never declared and stays local. This is interim: it will be replaced by an
-  `implicitGlobals` option on `evaluate` in a later, reviewed interpreter change
-  (`necrotalk-reviewer`), after which the wrapper goes back to three lines.
-- Line numbers in errors are mapped back so the typed line is line 1: with `offset = 1 + <number of
-  global lines>`, `Line N:` in the wrapped source becomes `Line max(1, N - offset):`. Tokenizer errors
-  come from the bare line and already say `Line 1`. A line that contains `on`/`end` handler structure,
-  or more than one statement, is rejected (`Line 1: The message box runs one statement.` or the
-  parser's error, remapped).
+- Enter runs the line as exactly one NecroTalk statement against the current card. The line is
+  wrapped as `on messageBox` / `<line>` / `end messageBox`, parsed with `parse`, and run with
+  `evaluate(…, { implicitGlobals: true })` using the same `DomHost` and the stack's globals. `me` is not
+  available (the evaluator reports `"me" is not available here`).
+- **Globals.** As in HyperCard, variables used in the message box are global: with `implicitGlobals`
+  every variable in the typed statement, `it` included, reads and writes the stack's globals map with no
+  declaration (necrotalk-interpreter REQ-5.2). This replaced an interim wrapper that declared every
+  identifier in the typed line `global`; the wrapper is three lines again.
+- Line numbers in errors are mapped back so the typed line is line 1: the wrapper adds one line before
+  the typed line (`LINE_OFFSET = 1`), so `Line N:` becomes `Line max(1, N - 1):`. A line that contains
+  `on`/`end` handler structure, or more than one statement, is rejected (`Line 1: The message box runs
+  one statement.` or the parser's error, remapped).
 - Errors appear in the status line as `Message box: <message>`.
 - After a run the text stays in the box and is selected, as in HyperCard. Up/Down arrows are not
   required (no history).
 - Globals are shared with scripts in both directions: a value the box puts into `x` is seen by a
-  handler that declares `global x`, and vice versa.
+  handler that declares `global x`, and vice versa. A property test (≥ 200 runs) checks this
+  round-trip through a real `openCard` handler for arbitrary variable names and values.
 
 ---
 

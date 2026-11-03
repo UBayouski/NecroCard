@@ -50,7 +50,11 @@ Freeze this list in the interpreter spec. Anything not listed is out of scope fo
 - `visual effect dissolve | wipe left | wipe right | scroll up` applied to the next `go`.
 
 **Data and properties**
-- `put <expr> into <container>` where container is `field "Name"`, a local variable, or `it`.
+- `put <expr> into <container>` where container is `field "Name"`, a variable, or `it`.
+- Variables are local to the running handler; `global <var>` makes that name shared stack-wide for the rest of the
+  handler, and `it` is local. Exception, as in HyperCard: the message box runs its line with implicit globals
+  (every variable, `it` included, is global). This is an option of the embedding evaluator, not syntax; scripts
+  cannot turn it on.
 - `put <expr> before | after <container>`.
 - `get <expr>` sets `it`.
 - `set [the] <property> of <object> to <expr>`; readable properties also via `the <property> of <object>`.

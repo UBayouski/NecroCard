@@ -63,7 +63,7 @@ visual effect dissolve | wipe left | wipe right | scroll up   -- applied to the 
 ### Data and properties
 
 ```
-put <expr> into <container>         -- container: field "<Name>", a local variable, or it
+put <expr> into <container>         -- container: field "<Name>", a variable, or it
 put <expr> before <container>
 put <expr> after <container>
 get <expr>                          -- sets `it`
@@ -87,6 +87,12 @@ ask <expr> [with <default>]         -- result in `it`
 - `do` and `sort` are rejected at parse time with the exact messages from the error examples below, so Summon can
   catch them before a script is loaded.
 - `answer` with no `with` means one "OK" button. More than three buttons is a parse error, as in HyperCard.
+- Variable scope: variables are local to the running handler; `global <var>` makes that name read and write the
+  stack-wide globals map for the rest of the handler. `it` is always local. The one exception is the
+  `implicitGlobals` option of `evaluate` (used by the message box, as in HyperCard): in the handler named in that
+  `evaluate` call, every variable — `it` and parameters included — reads and writes the globals map with no
+  declaration. Handlers it calls by name keep normal local scope. This is an embedding option, not syntax; scripts
+  cannot turn it on.
 
 ### Control flow
 
@@ -198,6 +204,13 @@ written for them until the core is implemented, tested, and Summon works end to 
   case-insensitive.
 - Do not expose internal token names or AST node names in error messages shown to users.
 - The `NecroTalkError` type in `errors.ts` must carry `line`, `column`, and `message`.
+- Host errors: any error thrown by a `HostInterface` call that is not already a `NecroTalkError` (or one of the
+  evaluator's internal control-flow signals, which always pass through) is rethrown by the
+  evaluator as a `NecroTalkError` at the current statement's line (column 1), with the host's message collapsed to
+  one line and its trailing period dropped before `formatError` adds one: `Line 4: No field named "Score".`
+  `NecroTalkError`s from the host (for example from a nested dispatch inside `goToCard`) pass through unchanged.
+  Every host call in the evaluator goes through this conversion; do not add an unwrapped `host.` call. Host
+  messages are shown to users verbatim, so hosts must throw plain-English messages.
 
 ## Property-based testing targets (fast-check)
 
@@ -210,6 +223,8 @@ These invariants must have PBT coverage in `*.test.ts` files co-located with the
    `[0, stack.cards.length - 1]`.
 4. **Serialization round-trip**: stack JSON serialized and deserialized is identity (tested via model, but
    interpreter must not break the JSON shape of scripts).
+5. **implicitGlobals write invariant**: with `implicitGlobals`, `put X into <var>` leaves `X` in the globals map
+   under the lowercased name.
 
 ## Message-passing order
 

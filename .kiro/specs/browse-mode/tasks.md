@@ -156,8 +156,8 @@ evaluator.
 ## Task 9 — Message box
 
 **Steps:**
-1. `messageBox.ts`: `wrapStatement` (interim global declarations, REQ-7), `remapLine`,
-   `runMessageBoxLine`.
+1. `messageBox.ts`: `wrapStatement`, `remapLine`, `runMessageBoxLine` (REQ-7; runs with
+   `implicitGlobals`).
 2. Wire into `BrowseRuntime.runMessageBox` with the `Message box:` status prefix.
 3. `messageBox.test.ts`: `go next` navigates; `put "x" into field "Name"` updates the field; two
    statements rejected; `on`/`end` structure rejected; line numbers remapped by the wrapper offset;

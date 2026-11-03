@@ -270,3 +270,23 @@ What changed: Browse mode works end to end in a real browser on the first MCP ru
 retro-skin gap visible: field and button text are anti-aliased sans-serif, the accepted fallback until open-licensed
 bitmap fonts land. Small follow-up: add a favicon so the console is clean, or the e2e test's no-console-errors rule
 will trip on a stricter run.
+
+## 2026-11-03 — Interpreter follow-up: host error lines and implicit globals (reviewed)
+Surface: CLI (Auto)
+Features: agent, spec, steering, pbt
+What I asked for: The two interpreter debts spec 3 left behind, as one small change with the reviewer in the loop:
+host errors rethrown as NecroTalkError at the statement line, and an implicitGlobals option on evaluate so the
+message box stops rewriting typed source. Plus a favicon so the e2e console check stays clean.
+What Kiro did: Routed all host calls in the evaluator through one wrapper that turns a plain host Error into
+`Line N: <message>` and lets NecroTalkError and the internal pass/exit/next signals through unchanged. Added
+implicitGlobals: every variable in the called handler, `it` and parameters included, lives in the globals map;
+handlers it calls by name keep normal locals, as in HyperCard's message box. messageBox.ts is back to a three-line
+wrapper with no tokenizer import. Drew a 16 by 16 two-colour ghost favicon with a throwaway script and added an e2e
+assertion that it serves. Reviewer round 1 found no code defect but one documentation conflict (the brief still
+called a put target "a local variable", and steering says the brief wins), plus five test gaps; Kiro fixed the brief
+and added the tests. Round 2: PASS. 439 Vitest tests in 24 files, 2 e2e tests, typecheck, lint and build clean.
+What changed: A broken script in browse mode now reports `Script error in button "Lost": Line 2: No field named
+"Missing"` instead of a bare message. The reviewer again earned its keep on documentation drift rather than code:
+the brief, the steering and the spec are the contract, and the agent checks the code against all three. One side
+effect documented rather than hidden: with implicit globals, a parameter called without an argument sets that global
+to empty.

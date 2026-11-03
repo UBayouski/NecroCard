@@ -23,7 +23,7 @@ src/
         ├── dialogs.ts           # showAnswer(), showAsk() — modal 1-bit dialogs
         ├── domHost.ts           # DomHost implements HostInterface
         ├── runtime.ts           # BrowseRuntime: busy flag, send(), gestures, error status
-        ├── messageBox.ts        # wrapStatement (interim global declarations), remapLine, runMessageBoxLine
+        ├── messageBox.ts        # wrapStatement, remapLine, runMessageBoxLine (implicitGlobals)
         ├── stackPicker.ts       # <select> of fixtures, ?stack= handling
         └── *.test.ts            # co-located tests
 test/e2e/browse.spec.ts          # Playwright click-through
@@ -393,39 +393,27 @@ top('Script error in card "<card 1 name>"', async () => {   // card 1 receives b
 
 ```ts
 export const WRAPPER_HANDLER = 'messageBox';
-export interface Wrapped { source: string; offset: number; declarations: number }
-export function wrapStatement(line: string): Wrapped;
-export function remapLine(message: string, offset: number): string;  // Line N → Line max(1, N - offset)
+export const LINE_OFFSET = 1;
+export function wrapStatement(line: string): string;   // `on messageBox\n${line}\nend messageBox`
+export function remapLine(message: string): string;    // Line N → Line max(1, N - LINE_OFFSET)
 export async function runMessageBoxLine(line, host, globals): Promise<void>;
 ```
 
-**Interim globals design.** The evaluator exposes a global only to handlers that declare it, and the
-box runs one statement, so the box could never share globals with scripts. HyperCard treats
-message-box variables as global, so `wrapStatement` tokenizes the typed line (`tokenize` from
-`src/interp/tokenizer.ts`) and emits one `global <name>` line per distinct identifier token
-(lowercased) between `on messageBox` and the typed line:
+**Globals.** HyperCard treats message-box variables as global. The box runs its statement with
+`evaluate(script, 'messageBox', [], host, globals, { implicitGlobals: true })`, so every variable in it,
+`it` included, reads and writes the stack's globals map without a declaration, and a handler that
+declares `global x` sees what the box put into `x` (and the reverse). History: the first build used an
+interim wrapper that tokenized the line and inserted one `global <name>` per identifier, with a
+variable line offset; that was replaced by the `implicitGlobals` option in a reviewed interpreter
+change, and `messageBox.ts` no longer imports the tokenizer.
 
-```
-on messageBox            -- line 1
-global ghost             -- lines 2 .. 1+k   (k = declarations)
-put "Boo" into ghost     -- line 2+k         (offset = 1 + k)
-end messageBox
-```
-
-Identifiers that are property, function or handler names get a harmless declaration. `it` is a
-tokenizer keyword, so it is never declared and stays local. To be replaced by an `implicitGlobals`
-option on `evaluate` in a later reviewed interpreter change (`necrotalk-reviewer`); then the wrapper
-returns to three lines and `offset` to 1.
-
-`runMessageBoxLine` rejects embedded newlines, tokenizes and wraps the line (tokenizer errors come
-from the bare line and already say `Line 1`), parses, then checks the handler body: `body.length -
-declarations` must be 1 (0 → no-op, e.g. a comment; > 1 → `Line 1: The message box runs one
-statement.`). It calls `evaluate(script, 'messageBox', [], host, globals, {})` — no `me`.
-`NecroTalkError`s with `line > 1` are rethrown with `remapLine(message, offset)`. An empty or
+`runMessageBoxLine` rejects embedded newlines, wraps and parses the line, then checks the handler
+body: 0 statements → no-op (e.g. a comment), more than 1 → `Line 1: The message box runs one
+statement.` `NecroTalkError`s with `line > 1` are rethrown through `remapLine`. An empty or
 whitespace-only line does nothing. `BrowseRuntime.runMessageBox` runs it through `top('Message box', …)`.
 
 `messageBox` is not a NecroTalk keyword, so the wrapper never collides with the reserved-word check.
-`tokenize` and `parse` are imported here, in the UI layer; the evaluator still never imports either.
+`parse` is imported here, in the UI layer; the evaluator still never imports the parser.
 
 ---
 
@@ -460,7 +448,7 @@ Chrome uses the light theme `#f0f0f0` (retro-ui "pick one"); it is never inherit
 | `dialogs.test.ts` | happy-dom | answer resolves with clicked/Enter label; ask OK/Cancel/Escape; focus restore |
 | `domHost.test.ts` | happy-dom | navigation order (closeCard → render → openCard), no-op same card, depth guard, effect consumed |
 | `runtime.test.ts` | happy-dom | load sends openStack then openCard; mouseUp only on same target; busy drops gestures; error status text |
-| `messageBox.test.ts` | happy-dom | wrap, remap, one-statement rule, globals shared; PBT #1 |
+| `messageBox.test.ts` | happy-dom | wrap, remap, one-statement rule, host errors on line 1, globals shared; PBT #1; globals round-trip PBT |
 | `test/e2e/browse.spec.ts` | Playwright | REQ-8.3 quiz click-through |
 
 PBT arbitraries reuse the shape of the `stack-model` stack arbitrary but constrain names to
@@ -473,10 +461,9 @@ The Playwright config uses `webServer: { command: 'npm run dev -- --port 5174 --
 
 ## Open questions (all five defaults accepted)
 
-1. **Line numbers on host errors.** `DomHost` cannot know the statement line, and the evaluator does not
-   wrap host errors, so `No field named "X"` is shown without `Line N:`. Default: accept for this spec.
-   Fix later with a small `src/interp/` change (evaluator rethrows non-`NecroTalkError` host errors as
-   `NecroTalkError` at `stmt.line`), reviewed by `necrotalk-reviewer`.
+1. **Line numbers on host errors.** Resolved by a follow-up reviewed interpreter change: the evaluator
+   rethrows any non-`NecroTalkError` host error as a `NecroTalkError` at the current statement's line,
+   so `DomHost`'s plain `Error('No field named "X"')` is shown as `Line N: No field named "X".`
 2. **Name-only `me`.** `ResolvedObjectRef` has no id, so duplicate names resolve to the first object.
    Default: accept; an optional `id` on `ResolvedObjectRef` would be an interpreter change.
 3. **Fonts.** Accepted: `--font-ui` and `--font-field` fall back to `sans-serif`, `--font-script` to

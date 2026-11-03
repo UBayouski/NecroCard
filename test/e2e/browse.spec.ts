@@ -29,3 +29,9 @@ test('quiz: title → Q1 → Q2 → Q3 → Results', async ({ page }) => {
   await expect(page.getByRole('alert')).toHaveText('');
   expect(errors).toEqual([]);
 });
+
+test('favicon is served, so the browser logs no 404', async ({ page }) => {
+  const res = await page.request.get('/favicon.ico');
+  expect(res.status()).toBe(200);
+  expect((await res.body()).length).toBe(198);
+});

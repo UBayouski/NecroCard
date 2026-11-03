@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import * as fc from 'fast-check';
-import { evaluate } from './evaluator.js';
+import { evaluate, ExitRepeatException, NextRepeatException, PassException } from './evaluator.js';
 import type { HostInterface, ResolvedObjectRef, EvaluateOptions } from './evaluator.js';
 import { parse } from './parser.js';
 import { NecroTalkError } from './errors.js';
+import { KEYWORDS } from './tokenizer.js';
 
 // ---------------------------------------------------------------------------
 // Mock host
@@ -697,5 +698,233 @@ describe('regression — fifth reviewer pass: globals and put targets', () => {
     const globals = new Map<string, string>();
     await evaluate(parse('on h\n  global tag\n  put "x" before tag\nend h'), 'h', [], new MockHost(), globals);
     expect(globals.get('tag')).toBe('x');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Host errors carry the statement's line
+// ---------------------------------------------------------------------------
+
+/** A host whose chosen methods throw plain Errors, like the browser DomHost does. */
+class ThrowingHost extends MockHost {
+  constructor(private readonly failing: Set<string>, private readonly message = 'No field named "Ghost"') {
+    super();
+  }
+  private check(method: string) {
+    if (this.failing.has(method)) throw new Error(this.message);
+  }
+  override getFieldText(ref: ResolvedObjectRef) { this.check('getFieldText'); return super.getFieldText(ref); }
+  override setFieldText(ref: ResolvedObjectRef, t: string) { this.check('setFieldText'); super.setFieldText(ref, t); }
+  override getProperty(ref: ResolvedObjectRef, p: string) { this.check('getProperty'); return super.getProperty(ref, p); }
+  override setProperty(ref: ResolvedObjectRef, p: string, v: string) { this.check('setProperty'); super.setProperty(ref, p, v); }
+  override showObject(ref: ResolvedObjectRef) { this.check('showObject'); super.showObject(ref); }
+  override hideObject(ref: ResolvedObjectRef) { this.check('hideObject'); super.hideObject(ref); }
+  override beep() { this.check('beep'); super.beep(); }
+  override getDate() { this.check('getDate'); return super.getDate(); }
+  override getTime() { this.check('getTime'); return super.getTime(); }
+  override getCurrentCardIndex() { this.check('getCurrentCardIndex'); return super.getCurrentCardIndex(); }
+  override getCardNames() { this.check('getCardNames'); return super.getCardNames(); }
+  override random(n: number) { this.check('random'); return super.random(n); }
+  override getCardCount() { this.check('getCardCount'); return super.getCardCount(); }
+  override async goToCard(i: number) { this.check('goToCard'); return super.goToCard(i); }
+  override async answer(p: string, b: string[]) { this.check('answer'); return super.answer(p, b); }
+  override async ask(p: string, d: string) { this.check('ask'); return super.ask(p, d); }
+  override async setVisualEffect(e: string) { this.check('setVisualEffect'); return super.setVisualEffect(e); }
+}
+
+async function hostError(method: string, statement: string, message?: string): Promise<NecroTalkError> {
+  const src = `on h\n  beep\n  ${statement}\nend h`;
+  const host = new ThrowingHost(new Set([method]), message);
+  const err = await evaluate(parse(src), 'h', [], host, new Map()).then(() => null, (e: unknown) => e);
+  expect(err).toBeInstanceOf(NecroTalkError);
+  return err as NecroTalkError;
+}
+
+describe('host errors become NecroTalkErrors at the statement line', () => {
+  it.each([
+    ['getFieldText', 'put field "Ghost" into x'],
+    ['setFieldText', 'put "boo" into field "Ghost"'],
+    ['getFieldText', 'put "boo" after field "Ghost"'],
+    ['getProperty', 'put the label of button "Ghost" into x'],
+    ['setProperty', 'set the label of button "Ghost" to "x"'],
+    ['showObject', 'show field "Ghost"'],
+    ['hideObject', 'hide field "Ghost"'],
+    ['getDate', 'put the date into x'],
+    ['getTime', 'put the time into x'],
+    ['random', 'put random(6) into x'],
+    ['getCardCount', 'put the number of cards into x'],
+    ['getCardCount', 'go next'],
+    ['getCurrentCardIndex', 'go next'],
+    ['getCardNames', 'go to card "Beta"'],
+    ['goToCard', 'go next'],
+    ['answer', 'answer "boo"'],
+    ['ask', 'ask "boo"'],
+    ['setVisualEffect', 'visual effect dissolve'],
+  ])('%s: %s', async (method, statement) => {
+    const err = await hostError(method, statement);
+    expect(err.message).toBe('Line 3: No field named "Ghost".');
+    expect(err.line).toBe(3);
+    expect(err.column).toBe(1);
+  });
+
+  it('reports the line of the statement inside nested blocks', async () => {
+    const src = 'on h\n  repeat 2 times\n    if true then\n      show field "Ghost"\n    end if\n  end repeat\nend h';
+    const err = await evaluate(parse(src), 'h', [], new ThrowingHost(new Set(['showObject'])), new Map())
+      .catch((e: unknown) => e);
+    expect((err as NecroTalkError).message).toBe('Line 4: No field named "Ghost".');
+  });
+
+  it('beep failing on line 2 is reported on line 2', async () => {
+    const err = await hostError('beep', 'put 1 into x');
+    expect(err.message).toBe('Line 2: No field named "Ghost".');
+  });
+
+  it('does not double the period and keeps the message on one line', async () => {
+    expect((await hostError('showObject', 'show field "x"', 'Cannot hide a card.')).message)
+      .toBe('Line 3: Cannot hide a card.');
+    expect((await hostError('showObject', 'show field "x"', 'two\nlines')).message)
+      .toBe('Line 3: two lines.');
+    expect((await hostError('showObject', 'show field "x"', '')).message)
+      .toBe('Line 3: The host reported an error.');
+    expect((await hostError('showObject', 'show field "x"', '...')).message)
+      .toBe('Line 3: The host reported an error.');
+  });
+
+  it('control-flow signals thrown through a host call are never converted', async () => {
+    for (const signal of [new PassException('h'), new ExitRepeatException(), new NextRepeatException()]) {
+      class SignalHost extends MockHost {
+        override beep(): void { throw signal; }
+      }
+      const err = await evaluate(parse('on h\n  beep\nend h'), 'h', [], new SignalHost(), new Map())
+        .catch((e: unknown) => e);
+      expect(err).toBe(signal);
+    }
+  });
+
+  it('non-Error throws are converted too', async () => {
+    class StringHost extends MockHost {
+      override beep(): void { throw 'speaker on fire'; }
+    }
+    const err = await evaluate(parse('on h\n  beep\nend h'), 'h', [], new StringHost(), new Map())
+      .catch((e: unknown) => e);
+    expect((err as NecroTalkError).message).toBe('Line 2: speaker on fire.');
+  });
+
+  it('a NecroTalkError from the host (e.g. a nested dispatch) passes through unchanged', async () => {
+    const inner = new NecroTalkError('Line 7: Unknown command "boo".', 7, 3);
+    class NestedHost extends MockHost {
+      override goToCard(): Promise<void> { return Promise.reject(inner); }
+    }
+    const err = await evaluate(parse('on h\n  go next\nend h'), 'h', [], new NestedHost(), new Map())
+      .catch((e: unknown) => e);
+    expect(err).toBe(inner);
+  });
+
+  it('navigation errors keep their own message', async () => {
+    const err = await evaluate(parse('on h\n  go to card "Nowhere"\nend h'), 'h', [], new MockHost(), new Map())
+      .catch((e: unknown) => e);
+    expect((err as NecroTalkError).message).toBe('Line 2: No card named "Nowhere".');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// EvaluateOptions.implicitGlobals
+// ---------------------------------------------------------------------------
+
+describe('implicitGlobals', () => {
+  const runImplicit = (src: string, globals: Map<string, string>, host = new MockHost(), args: string[] = []) =>
+    evaluate(parse(src), 'h', args, host, globals, { implicitGlobals: true }).then(() => host);
+
+  it('reads and writes the globals map without a global declaration', async () => {
+    const globals = new Map([['score', '10']]);
+    const host = await runImplicit('on h\n  put score + 1 into score\n  put score into field "Out"\nend h', globals);
+    expect(globals.get('score')).toBe('11');
+    expect(host.fields.get('Out')).toBe('11');
+  });
+
+  it('it lives in the globals map too', async () => {
+    const globals = new Map<string, string>();
+    await runImplicit('on h\n  get 5\n  put "!" after it\nend h', globals);
+    expect(globals.get('it')).toBe('5!');
+    const host = await runImplicit('on h\n  put it into field "Out"\nend h', globals);
+    expect(host.fields.get('Out')).toBe('5!');
+  });
+
+  it('answer and ask results go to the global it', async () => {
+    const globals = new Map<string, string>();
+    const host = new MockHost();
+    host.askResponse = 'Mina';
+    await runImplicit('on h\n  ask "Name?"\nend h', globals, host);
+    expect(globals.get('it')).toBe('Mina');
+  });
+
+  it('repeat with counters and parameters are global', async () => {
+    const globals = new Map<string, string>();
+    await runImplicit('on h who\n  repeat with i = 1 to 3\n  end repeat\nend h', globals, new MockHost(), ['Vlad']);
+    expect(globals.get('i')).toBe('3');
+    expect(globals.get('who')).toBe('Vlad');
+  });
+
+  it('unset variables still evaluate to their own name, and start empty as put targets', async () => {
+    const globals = new Map<string, string>();
+    const host = await runImplicit('on h\n  put ghost into field "A"\n  put "*" after stars\nend h', globals);
+    expect(host.fields.get('A')).toBe('ghost');
+    expect(globals.get('stars')).toBe('*');
+    expect(globals.has('ghost')).toBe(false);
+  });
+
+  it('handlers called by name keep normal local scoping', async () => {
+    const globals = new Map<string, string>();
+    const src = 'on h\n  put 1 into x\n  helper\nend h\n\non helper\n  put 2 into x\n  put 3 into y\nend helper';
+    await runImplicit(src, globals);
+    expect(globals.get('x')).toBe('1');
+    expect(globals.has('y')).toBe(false);
+  });
+
+  it('a called handler that declares the global sees what the implicit caller wrote, and can change it', async () => {
+    const globals = new Map<string, string>();
+    const src = 'on h\n  put "Boo" into ghost\n  helper\n  put ghost into field "Out"\nend h\n\n'
+      + 'on helper\n  global ghost\n  put ghost into field "Seen"\n  put "Eek" into ghost\nend helper';
+    const host = await runImplicit(src, globals);
+    expect(host.fields.get('Seen')).toBe('Boo');
+    expect(host.fields.get('Out')).toBe('Eek');
+    expect(globals.get('ghost')).toBe('Eek');
+  });
+
+  it('a parameter with no argument sets that global to empty (parameters are variables)', async () => {
+    const globals = new Map([['who', 'Vlad']]);
+    await runImplicit('on h who\n  beep\nend h', globals);
+    expect(globals.get('who')).toBe('');
+  });
+
+  it('defaults to off: without the option nothing leaks into globals', async () => {
+    const globals = new Map<string, string>();
+    await evaluate(parse('on h\n  put 1 into x\n  get 2\nend h'), 'h', [], new MockHost(), globals);
+    expect(globals.size).toBe(0);
+  });
+
+  it('defaults to off: same-named globals are untouched by params, counters, put and it', async () => {
+    const globals = new Map([['who', 'G1'], ['i', 'G2'], ['x', 'G3'], ['it', 'G4']]);
+    const host = new MockHost();
+    await evaluate(
+      parse('on h who\n  repeat with i = 1 to 2\n  end repeat\n  put 9 into x\n  get 5\n  put who & i & x & it into field "Out"\nend h'),
+      'h', ['arg'], host, globals,
+    );
+    expect(Object.fromEntries(globals)).toEqual({ who: 'G1', i: 'G2', x: 'G3', it: 'G4' });
+    expect(host.fields.get('Out')).toBe('arg295');
+  });
+
+  it('PBT: put v into a variable with implicitGlobals stores v in globals under the lowercased name', async () => {
+    const value = fc.string({ unit: 'grapheme' }).filter(s => !/["\r\n]/.test(s));
+    const name = fc.stringMatching(/^[A-Za-z][A-Za-z0-9_]{0,7}$/)
+      .filter(n => !KEYWORDS.has(n.toLowerCase()));
+    await fc.assert(
+      fc.asyncProperty(name, value, async (n, v) => {
+        const globals = new Map<string, string>();
+        await runImplicit(`on h\n  put "${v}" into ${n}\nend h`, globals);
+        expect(globals.get(n.toLowerCase())).toBe(v);
+      }),
+      { numRuns: 200 },
+    );
   });
 });

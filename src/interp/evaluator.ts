@@ -61,6 +61,13 @@ export interface EvaluateOptions {
    * each level of the message path. If absent, any use of `me` is a runtime error.
    */
   me?: ResolvedObjectRef;
+  /**
+   * When true, every variable in the handler named in the evaluate() call (including
+   * `it` and the handler's parameters) reads and writes the `globals` map without a
+   * `global` declaration, as variables do in HyperCard's message box. Handlers it calls
+   * by name use normal local scoping. Default false.
+   */
+  implicitGlobals?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -92,6 +99,8 @@ interface Scope {
   globals: Map<string, string>;
   host: HostInterface;
   me?: ResolvedObjectRef;
+  /** Every variable (including `it`) lives in `globals` (EvaluateOptions.implicitGlobals). */
+  implicitGlobals: boolean;
 }
 
 /** Per-handler-invocation execution state threaded through executeStatement. */
@@ -123,7 +132,9 @@ export async function evaluate(
 ): Promise<void> {
   const handler = findHandler(script, handlerName);
   if (!handler) return;
-  await runHandler(handler, script, args, host, globals, options.me, { count: 0 }, 0);
+  await runHandler(
+    handler, script, args, host, globals, options.me, { count: 0 }, 0, options.implicitGlobals === true,
+  );
 }
 
 function findHandler(script: ScriptNode, name: string): HandlerNode | undefined {
@@ -139,6 +150,7 @@ async function runHandler(
   me: ResolvedObjectRef | undefined,
   budget: { count: number },
   callDepth: number,
+  implicitGlobals = false,
 ): Promise<void> {
   const ctx: ExecContext = {
     script,
@@ -148,12 +160,13 @@ async function runHandler(
     globals,
     host,
     me,
+    implicitGlobals,
     budget,
     loopDepth: 0,
     callDepth,
   };
   for (let i = 0; i < handler.params.length; i++) {
-    ctx.locals.set(handler.params[i].toLowerCase(), args[i] ?? '');
+    writeVar(handler.params[i], args[i] ?? '', ctx);
   }
 
   try {
@@ -173,6 +186,44 @@ async function runHandler(
 
 function runtimeError(line: number, msg: string): NecroTalkError {
   return new NecroTalkError(formatError(line, 1, msg), line, 1);
+}
+
+/** Exceptions the evaluator uses for control flow; never converted to errors. */
+function isControlFlow(e: unknown): boolean {
+  return e instanceof ExitHandlerException || e instanceof ExitRepeatException
+    || e instanceof NextRepeatException || e instanceof PassException;
+}
+
+/**
+ * Turn an error thrown by a host call into a NecroTalkError at the statement's line, so
+ * host errors (`No field named "X"`) read like every other runtime error. NecroTalkErrors
+ * (for example from a nested dispatch inside goToCard) and control-flow exceptions pass
+ * through unchanged. The host message is kept on one line without a trailing period,
+ * because formatError adds one.
+ */
+function fromHostError(e: unknown, line: number): unknown {
+  if (e instanceof NecroTalkError || isControlFlow(e)) return e;
+  const raw = e instanceof Error ? e.message : String(e);
+  const msg = raw.replace(/\s*[\r\n]+\s*/g, ' ').trim().replace(/\.+$/, '');
+  return runtimeError(line, msg === '' ? 'The host reported an error' : msg);
+}
+
+/** Run a synchronous host call, converting its errors (see fromHostError). */
+function hostCall<T>(line: number, fn: () => T): T {
+  try {
+    return fn();
+  } catch (e) {
+    throw fromHostError(e, line);
+  }
+}
+
+/** Run an asynchronous host call, converting its errors (see fromHostError). */
+async function hostCallAsync<T>(line: number, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    throw fromHostError(e, line);
+  }
 }
 
 /** Resolve a script object reference: evaluate its name, or substitute `me`. */
@@ -205,7 +256,8 @@ async function runLoopBody(body: StatementNode[], ctx: ExecContext): Promise<'co
 
 async function executeStatement(stmt: StatementNode, ctx: ExecContext): Promise<void> {
   const { globalDecls, globals, host } = ctx;
-  const evalExpr = (e: ExpressionNode) => evaluateExpression(e, ctx, stmt.line);
+  const line = stmt.line;
+  const evalExpr = (e: ExpressionNode) => evaluateExpression(e, ctx, line);
 
   ctx.budget.count++;
   if (ctx.budget.count > BUDGET_LIMIT) {
@@ -214,23 +266,24 @@ async function executeStatement(stmt: StatementNode, ctx: ExecContext): Promise<
 
   switch (stmt.kind) {
     case 'beep':
-      host.beep();
+      hostCall(line, () => host.beep());
       return;
 
     case 'go': {
-      const resolved = resolveNavigation(
-        stmt.target, host.getCurrentCardIndex(), host.getCardCount(), host.getCardNames(), stmt.line,
-      );
-      await host.goToCard(resolved);
+      const index = hostCall(line, () => host.getCurrentCardIndex());
+      const count = hostCall(line, () => host.getCardCount());
+      const names = hostCall(line, () => host.getCardNames());
+      const resolved = resolveNavigation(stmt.target, index, count, names, line);
+      await hostCallAsync(line, () => host.goToCard(resolved));
       return;
     }
 
     case 'visualEffect':
-      await host.setVisualEffect(stmt.effect);
+      await hostCallAsync(line, () => host.setVisualEffect(stmt.effect));
       return;
 
     case 'put':
-      writeContainer(stmt.target, stmt.mode, evalExpr(stmt.value), ctx, stmt.line);
+      writeContainer(stmt.target, stmt.mode, evalExpr(stmt.value), ctx, line);
       return;
 
     case 'get':
@@ -238,8 +291,9 @@ async function executeStatement(stmt: StatementNode, ctx: ExecContext): Promise<
       return;
 
     case 'set': {
-      const ref = resolveRef(stmt.object, ctx, stmt.line);
-      host.setProperty(ref, stmt.property, evalExpr(stmt.value));
+      const ref = resolveRef(stmt.object, ctx, line);
+      const value = evalExpr(stmt.value);
+      hostCall(line, () => host.setProperty(ref, stmt.property, value));
       return;
     }
 
@@ -251,7 +305,8 @@ async function executeStatement(stmt: StatementNode, ctx: ExecContext): Promise<
     }
 
     case 'answer': {
-      const result = await host.answer(evalExpr(stmt.prompt), stmt.buttons);
+      const prompt = evalExpr(stmt.prompt);
+      const result = await hostCallAsync(line, () => host.answer(prompt, stmt.buttons));
       writeVar('it', result, ctx);
       return;
     }
@@ -259,18 +314,22 @@ async function executeStatement(stmt: StatementNode, ctx: ExecContext): Promise<
     case 'ask': {
       const prompt = evalExpr(stmt.prompt);
       const def = stmt.default ? evalExpr(stmt.default) : '';
-      const result = await host.ask(prompt, def);
+      const result = await hostCallAsync(line, () => host.ask(prompt, def));
       writeVar('it', result, ctx);
       return;
     }
 
-    case 'show':
-      host.showObject(resolveRef(stmt.object, ctx, stmt.line));
+    case 'show': {
+      const ref = resolveRef(stmt.object, ctx, line);
+      hostCall(line, () => host.showObject(ref));
       return;
+    }
 
-    case 'hide':
-      host.hideObject(resolveRef(stmt.object, ctx, stmt.line));
+    case 'hide': {
+      const ref = resolveRef(stmt.object, ctx, line);
+      hostCall(line, () => host.hideObject(ref));
       return;
+    }
 
     case 'if': {
       const branch = isTruthy(evalExpr(stmt.condition)) ? stmt.thenBranch : (stmt.elseBranch ?? []);
@@ -352,10 +411,13 @@ async function executeStatement(stmt: StatementNode, ctx: ExecContext): Promise<
 
 /**
  * The stored value of a variable, or undefined if it has never been set.
- * Stack-wide globals are visible only in handlers that declared them with `global`.
+ * Stack-wide globals are visible only in handlers that declared them with `global`,
+ * unless the handler runs with implicitGlobals (then every variable, `it` included,
+ * lives in the globals map).
  */
 function storedVar(key: string, scope: Scope): string | undefined {
   const k = key.toLowerCase();
+  if (scope.implicitGlobals) return k === 'it' ? (scope.globals.get('it') ?? '') : scope.globals.get(k);
   if (k === 'it') return scope.locals.get('it') ?? '';
   if (scope.globalDecls.has(k)) return scope.globals.get(k) ?? '';
   return scope.locals.get(k);
@@ -368,7 +430,7 @@ function readVar(key: string, scope: Scope): string {
 
 function writeVar(key: string, value: string, scope: Scope): void {
   const k = key.toLowerCase();
-  if (scope.globalDecls.has(k)) {
+  if (scope.implicitGlobals || scope.globalDecls.has(k)) {
     scope.globals.set(k, value);
   } else {
     scope.locals.set(k, value);
@@ -383,7 +445,7 @@ function writeContainer(
   line: number,
 ): void {
   if (container.kind === 'it') {
-    scope.locals.set('it', applyMode(scope.locals.get('it') ?? '', value, mode));
+    writeVar('it', applyMode(storedVar('it', scope) ?? '', value, mode), scope);
     return;
   }
   if (container.kind === 'variable') {
@@ -394,7 +456,9 @@ function writeContainer(
   }
   // field container
   const ref = resolveRef(container.ref, scope, line);
-  scope.host.setFieldText(ref, applyMode(scope.host.getFieldText(ref), value, mode));
+  const { host } = scope;
+  const current = hostCall(line, () => host.getFieldText(ref));
+  hostCall(line, () => host.setFieldText(ref, applyMode(current, value, mode)));
 }
 
 function applyMode(current: string, value: string, mode: 'into' | 'before' | 'after'): string {
@@ -431,15 +495,20 @@ function evaluateExpression(expr: ExpressionNode, scope: Scope, currentLine: num
     case 'functionCall':
       return callFunction(expr.name, expr.args.map(ev), host, currentLine);
 
-    case 'field':
-      return host.getFieldText(resolveRef(expr.ref, scope, currentLine));
+    case 'field': {
+      const ref = resolveRef(expr.ref, scope, currentLine);
+      return hostCall(currentLine, () => host.getFieldText(ref));
+    }
 
     case 'property': {
-      if (expr.object) return host.getProperty(resolveRef(expr.object, scope, currentLine), expr.property);
+      if (expr.object) {
+        const ref = resolveRef(expr.object, scope, currentLine);
+        return hostCall(currentLine, () => host.getProperty(ref, expr.property));
+      }
       // Bare `the <name>` is valid only for `the date` and `the time`
       const prop = expr.property.toLowerCase();
-      if (prop === 'date') return host.getDate();
-      if (prop === 'time') return host.getTime();
+      if (prop === 'date') return hostCall(currentLine, () => host.getDate());
+      if (prop === 'time') return hostCall(currentLine, () => host.getTime());
       throw runtimeError(currentLine, `Unknown property "${expr.property}"`);
     }
 
@@ -450,7 +519,7 @@ function evaluateExpression(expr: ExpressionNode, scope: Scope, currentLine: num
     }
 
     case 'count': {
-      if (expr.what === 'cards') return String(host.getCardCount());
+      if (expr.what === 'cards') return String(hostCall(currentLine, () => host.getCardCount()));
       return String(countChunks(expr.what, ev(expr.source!)));
     }
 
@@ -511,7 +580,10 @@ function callFunction(name: string, args: string[], host: HostInterface, line: n
   if (args.length !== arity) {
     throw runtimeError(line, `${name} expects ${arity} argument${arity === 1 ? '' : 's'}`);
   }
-  if (key === 'random') return String(host.random(Math.floor(toNumber(args[0], line))));
+  if (key === 'random') {
+    const n = Math.floor(toNumber(args[0], line));
+    return String(hostCall(line, () => host.random(n)));
+  }
   return String(args[0].length); // length
 }
 

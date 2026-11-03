@@ -301,12 +301,18 @@ export interface HostInterface {
 ### REQ-5.2 — Evaluator function
 
 ```ts
+export interface EvaluateOptions {
+  me?: ResolvedObjectRef;      // the object whose script is running; supplied by dispatchMessage
+  implicitGlobals?: boolean;   // default false; see below
+}
+
 export function evaluate(
   script: ScriptNode,
   handlerName: string,
   args: string[],
   host: HostInterface,
   globals: Map<string, string>,
+  options?: EvaluateOptions,
 ): Promise<void>;
 ```
 
@@ -315,6 +321,8 @@ export function evaluate(
 - `args`: arguments passed to the handler (empty array for most system handlers).
 - `host`: the host interface for side effects.
 - `globals`: a shared map of global variables (modified in place by `global <var>` statements).
+- `options.me`: `me` for this handler. Without it, any use of `me` is a runtime error.
+- `options.implicitGlobals`: see "Implicit globals" below.
 
 The evaluator walks the AST and executes the handler's body. It maintains a local scope (`Map<string, string>`)
 for local variables and the special `it` variable. All values are strings (NecroTalk is dynamically typed with
@@ -325,13 +333,29 @@ A `global <varName>` statement marks that name as global in the current handler 
 writes go to the shared globals map. An undeclared, unset variable (not in locals, not declared global, not in
 globals) evaluates to its own name (lowercased), matching HyperCard behavior.
 
+**Implicit globals.** When `options.implicitGlobals` is true, every variable in the handler named in the `evaluate`
+call — including `it`, the handler's parameters and `repeat with` counters — reads and writes the `globals` map
+directly, with no `global` declaration (`it` is stored under the key `it`). Unset variables still evaluate to their
+own name, and still start empty as `put` targets. Parameters are written on entry like any variable, so a parameter
+with no argument sets that global to empty. Handlers called by name from that handler use normal local
+scoping. This exists for embedders: the browser message box uses it so its variables are global, as in HyperCard's
+message box. Scripts cannot enable it.
+
+**Host errors.** Every call to a `HostInterface` method is wrapped: if it throws anything that is not a
+`NecroTalkError` (or one of the evaluator's internal control-flow signals), the evaluator throws
+`NecroTalkError(formatError(line, 1, msg), line, 1)` where `line` is the current statement's line and `msg` is the
+host error's message (or `String(thrown)`) collapsed to one line with any trailing period removed; an empty message
+becomes `The host reported an error`. Example: a host that throws `Error('No field named "Score"')` while running
+line 4 yields `Line 4: No field named "Score".` A `NecroTalkError` thrown by the host — for example from a nested
+`openCard` dispatch inside `goToCard` — passes through unchanged, keeping its own line.
+
 The evaluator tracks a statement execution count internally. After 100,000 statements it throws `NecroTalkError`
 with message `"Script ran too long."` at the current statement's line and column 1.
 
 ### REQ-5.3 — Expression evaluation
 
-Implement a separate `evaluateExpression(expr: ExpressionNode, scope: Map<string, string>, host: HostInterface): string`
-helper. All expressions return strings; arithmetic operations coerce to numbers, perform the operation, and return
+Implement a separate internal `evaluateExpression(expr: ExpressionNode, scope: Scope, currentLine: number): string`
+helper, where `Scope` bundles locals, declared globals, the globals map, the host, `me` and the implicitGlobals flag. All expressions return strings; arithmetic operations coerce to numbers, perform the operation, and return
 a string result. Arithmetic on a non-numeric string value throws `NecroTalkError` with the current statement's
 line number.
 
@@ -389,7 +413,8 @@ dispatcher catches this and continues the chain.
 ### REQ-6.3 — Error propagation
 
 If any handler throws a `NecroTalkError` or another unhandled exception, the dispatcher does not catch it — the error
-propagates to the caller (UI browse mode will display the error).
+propagates to the caller (UI browse mode will display the error). Errors raised by host calls reach the dispatcher
+already converted to `NecroTalkError` with a line number (REQ-5.2, "Host errors").
 
 ---
 
@@ -467,6 +492,21 @@ Navigation wrapping: `next` on the last card wraps to card 0; `prev` on card 0 w
 Generate arbitrary sequences of valid `go` commands and assert that `resolveNavigation` returns a value in
 `[0, cardCount - 1]` for a 5-card stack. Also test the evaluator integration with a thin mock host. Run at least
 200 examples with sequences of 1 to 20 commands each.
+
+### REQ-8.4 — implicitGlobals write invariant
+
+Generate an identifier (not a reserved word) and a string value (excluding `"`, `\n`, `\r`); evaluate
+`put "<value>" into <identifier>` with `implicitGlobals: true`; assert `globals.get(identifier.toLowerCase())`
+equals the value. Run at least 200 examples. (The browser message box adds a PBT on top: a value put in the box
+round-trips through a handler that declares the global, and back.)
+
+### REQ-8.5 — Host error conversion (unit tests)
+
+For every host-calling statement and expression (`beep`, `go`, `visual effect`, `put` into/after a field, field
+reads, `set`, `the <prop> of`, `the date`/`the time`, `the number of cards`, `random`, `answer`, `ask`, `show`,
+`hide`), a host that throws a plain `Error` yields a `NecroTalkError` with that statement's line, including inside
+nested blocks. A `NecroTalkError` thrown by the host passes through unchanged; a non-`Error` throw is converted;
+the period is never doubled.
 
 ---
 

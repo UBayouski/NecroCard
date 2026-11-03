@@ -41,6 +41,7 @@ function sampleStack(): Stack {
           button('Jump', { script: [handler('mouseDown', 'go next'), handler('mouseUp', log('jump-up'))].join('\n') }),
           button('Ask', { script: handler('mouseUp', 'answer "Boo?" with "Eek"', 'put it after field "Log"') }),
           button('Bad', { script: handler('mouseUp', 'go to card "Q9"') }),
+          button('Lost', { script: handler('mouseUp', 'hide field "Missing"') }),
           button('Fx', { script: handler('mouseUp', 'visual effect dissolve') }),
           button('Next', { script: handler('mouseUp', 'go next') }),
           field('Locked', { script: handler('mouseUp', log('locked')) }),
@@ -203,6 +204,14 @@ describe('BrowseRuntime busy, errors, effects', () => {
     expect(stage.surface.dataset.busy).toBe('false');
     await clickOn(rt, el('Press'));
     expect(messages).toEqual([]); // cleared by the next successful gesture
+  });
+
+  it('host errors from DomHost carry the script line', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { rt, el, messages } = setup();
+    await rt.load(sampleStack());
+    await clickOn(rt, el('Lost'));
+    expect(messages).toEqual(['Script error in button "Lost": Line 2: No field named "Missing".']);
   });
 
   it('a visual effect without go does not leak into the next gesture', async () => {
