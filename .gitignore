@@ -24,3 +24,6 @@ playwright-report/
 # IMPORTANT (Kiroween 2026 rules): the /.kiro directory and all its sub-folders
 # MUST be committed. Never add .kiro, .kiro/specs, .kiro/hooks, .kiro/steering,
 # .kiro/agents or .kiro/settings to this file.
+
+# Playwright MCP screenshots and snapshots
+.playwright-mcp/

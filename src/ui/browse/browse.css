@@ -1,0 +1,368 @@
+/* NecroCard browse mode. Everything under .card-surface is strictly 1-bit (#000 / #fff). */
+
+/* ------------------------------------------------------------------ card surface */
+
+.card-surface {
+  /* Reset everything inherited from the chrome, then set the 1-bit defaults. */
+  all: initial;
+  display: block;
+  position: relative;
+  box-sizing: border-box;
+  width: var(--card-width);
+  height: var(--card-height);
+  overflow: hidden;
+  background: #ffffff;
+  color: #000000;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: normal;
+  image-rendering: pixelated;
+  transform-origin: 0 0;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.card-surface *,
+.card-surface *::before,
+.card-surface *::after {
+  box-sizing: border-box;
+}
+
+.card-layer,
+.background-layer,
+.card-objects {
+  position: absolute;
+  inset: 0;
+  background: #ffffff;
+}
+
+.background-layer,
+.card-objects {
+  background: transparent;
+}
+
+/* The incoming card during a stepped transition sits above the outgoing one. */
+.card-layer--incoming {
+  z-index: var(--z-transition-top);
+}
+
+.card-surface .card-object {
+  position: absolute;
+}
+
+/* Object rules use `all: unset` + an explicit display, which outranks the UA [hidden] rule.
+   This !important is the UA-reset exception allowed by retro-ui. */
+.card-surface .card-object[hidden] {
+  display: none !important;
+}
+
+/* ------------------------------------------------------------------ buttons */
+
+.card-surface .button {
+  all: unset;
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #ffffff;
+  color: #000000;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.card-surface .button-label {
+  position: relative;
+  padding: 0 4px;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+/* 1px bevel drawn as a border pair inside the frame (no box-shadow on card objects). */
+.card-surface .button-rect::after,
+.card-surface .button-roundrect::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-top: 1px solid #ffffff;
+  border-left: 1px solid #ffffff;
+  border-right: 1px solid #000000;
+  border-bottom: 1px solid #000000;
+  pointer-events: none;
+}
+
+.card-surface .button-rect {
+  border: 1px solid #000000;
+}
+
+.card-surface .button-roundrect {
+  border: 2px solid #000000;
+  border-radius: 8px;
+}
+
+.card-surface .button-roundrect::after {
+  border-radius: 6px;
+}
+
+.card-surface .button-transparent {
+  border: 0;
+  background: transparent;
+}
+
+.card-surface .button--hilite {
+  background: #000000;
+  color: #ffffff;
+}
+
+.card-surface .button--hilite::after {
+  border-color: #000000;
+}
+
+.card-surface .button:focus-visible {
+  outline: 1px dotted #000000;
+  outline-offset: -4px;
+}
+
+.card-surface .button--hilite:focus-visible {
+  outline-color: #ffffff;
+}
+
+/* ------------------------------------------------------------------ fields */
+
+.card-surface .field {
+  display: flex;
+  overflow: hidden;
+  background: #ffffff;
+  color: #000000;
+  font-family: var(--font-field);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.card-surface .field-rect,
+.card-surface .field-scrolling {
+  border: 1px solid #000000;
+}
+
+.card-surface .field-transparent {
+  border: 0;
+  background: transparent;
+}
+
+.card-surface .field-text {
+  all: unset;
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 2px 4px;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  font-family: var(--font-field);
+  font-size: 12px;
+  line-height: 1.2;
+  color: #000000;
+  background: transparent;
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.card-surface .field--locked .field-text {
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.card-surface textarea.field-text:focus-visible {
+  outline: 1px dotted #000000;
+  outline-offset: -2px;
+}
+
+.card-surface .field-scrolling .field-text {
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.card-surface .field-scrolling .field-text::-webkit-scrollbar {
+  display: none;
+}
+
+/* Classic scroll bar, drawn with DOM elements */
+.card-surface .scroll-bar {
+  display: flex;
+  flex: 0 0 16px;
+  flex-direction: column;
+  width: 16px;
+  height: 100%;
+  border-left: 1px solid #000000;
+  background: #ffffff;
+}
+
+.card-surface .scroll-arrow {
+  position: relative;
+  flex: 0 0 16px;
+  height: 16px;
+  background: #ffffff;
+}
+
+.card-surface .scroll-arrow--up {
+  border-bottom: 1px solid #000000;
+}
+
+.card-surface .scroll-arrow--down {
+  border-top: 1px solid #000000;
+}
+
+/* Arrow glyphs as hard-edged border triangles */
+.card-surface .scroll-arrow::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+}
+
+.card-surface .scroll-arrow--up::before {
+  top: 4px;
+  border-bottom: 6px solid #000000;
+}
+
+.card-surface .scroll-arrow--down::before {
+  top: 5px;
+  border-top: 6px solid #000000;
+}
+
+.card-surface .scroll-track {
+  position: relative;
+  flex: 1 1 auto;
+  background: #ffffff;
+}
+
+.card-surface .scroll-track--active {
+  background-image: url("../../assets/patterns/dither-50.svg");
+  background-size: 8px 8px;
+  image-rendering: pixelated;
+}
+
+.card-surface .scroll-thumb {
+  position: absolute;
+  left: 0;
+  width: 15px;
+  height: 16px;
+  border-top: 1px solid #000000;
+  border-bottom: 1px solid #000000;
+  background: #ffffff;
+}
+
+/* ------------------------------------------------------------------ images */
+
+.card-surface .image {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.card-surface .image--placeholder {
+  border: 1px solid #000000;
+  background-color: #ffffff;
+  background-image: url("../../assets/patterns/dither-50.svg");
+  background-size: 8px 8px;
+}
+
+/* ------------------------------------------------------------------ dialogs */
+
+.card-surface .dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-dialog);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
+/* Classic double frame: 1px black, 1px white gap, 2px black, drawn with nested borders. */
+.card-surface .dialog {
+  width: 360px;
+  border: 1px solid #000000;
+  background: #ffffff;
+  color: #000000;
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.card-surface .dialog-body {
+  margin: 1px;
+  padding: 12px 14px 12px 14px;
+  border: 2px solid #000000;
+  background: #ffffff;
+}
+
+.card-surface .dialog-prompt {
+  margin: 0 0 12px 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  line-height: 1.2;
+}
+
+.card-surface .dialog-input {
+  all: unset;
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  height: 20px;
+  margin: 0 0 12px 0;
+  padding: 2px 4px;
+  border: 1px solid #000000;
+  background: #ffffff;
+  color: #000000;
+  font-family: var(--font-field);
+  font-size: 12px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.card-surface .dialog-input:focus-visible {
+  outline: 1px dotted #000000;
+  outline-offset: -3px;
+}
+
+.card-surface .dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+.card-surface .dialog-button-slot,
+.card-surface .dialog-default-ring {
+  display: inline-block;
+  padding: 3px;
+}
+
+/* Heavy rounded ring around the default button. */
+.card-surface .dialog-default-ring {
+  border: 3px solid #000000;
+  border-radius: 11px;
+  padding: 0;
+}
+
+.card-surface .dialog-button {
+  position: relative;
+  min-width: 64px;
+  height: 20px;
+}
+
+.card-surface .dialog-button:active {
+  background: #000000;
+  color: #ffffff;
+}

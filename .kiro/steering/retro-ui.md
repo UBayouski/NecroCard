@@ -63,7 +63,12 @@ Do not use percentage widths or viewport units on the card element itself.
 
 - All CSS class names use **kebab-case**: `card-surface`, `button-rect`, `field-scrolling`.
 - State variants use BEM-style modifiers: `button--selected`, `card--active`.
-- No CSS-in-JS. No `style` attributes on elements except for dynamic `rect` positioning (x, y, w, h).
+- No CSS-in-JS. No `style` attributes on elements except:
+  - dynamic `rect` positioning (x, y, w, h);
+  - per-frame transition styles set by the transition engine on the card layers: `mask-image`
+    (and its `-webkit-` form, with `mask-size` / `mask-repeat`), `clip-path`, and `transform`,
+    removed when the transition ends;
+  - the scroll thumb's `top` in a scrolling field's scroll bar.
 - Dynamic position and size are applied as inline `style` with `left`, `top`, `width`, `height` in `px`.
 - Use CSS custom properties (variables) for the palette, card dimensions, and font stacks. Define them on
   `:root` in a dedicated `src/ui/variables.css`.

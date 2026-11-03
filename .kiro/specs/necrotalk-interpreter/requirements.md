@@ -520,8 +520,10 @@ Out-of-range chunk access (index ≤ 0 or > count) returns an empty string `""`.
 
 ### REQ-10.2 — Properties
 
-- `the date`: calls `host.getDate()`, returns ISO date string.
-- `the time`: calls `host.getTime()`, returns ISO time string.
+- `the date`: calls `host.getDate()` and returns its string unchanged. The format is the host's choice; the
+  browser host (`browse-mode` REQ-4.9) uses the HyperCard short form, e.g. `11/3/26`.
+- `the time`: calls `host.getTime()` and returns its string unchanged. The format is the host's choice; the
+  browser host uses the HyperCard short form, e.g. `2:05 PM`.
 - `the <property> of <objectRef>`: calls `host.getProperty(ref, property)`.
 
 Chunk expressions (`word N of <expr>`) are evaluated by first evaluating `<expr>`, then splitting and indexing.

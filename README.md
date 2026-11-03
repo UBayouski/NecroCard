@@ -29,6 +29,9 @@ Coming soon. Target: `npm install`, `npm run dev`.
 Specs, steering docs, hooks, custom agents, and MCP settings live in [`.kiro/`](.kiro/). The running log of how Kiro
 was used during the build is in [`KIRO_USAGE.md`](KIRO_USAGE.md). The full write-up is added before submission.
 
+The Playwright MCP server in `.kiro/settings/mcp.json` is configured for Windows, where `npx` is a script and must
+run through `cmd /c`. On macOS or Linux, change `"command"` to `"npx"` and drop `"/c"` and `"npx"` from `args`.
+
 ## Disclosure
 
 NecroCard was created from scratch during the Kiroween 2026 submission period (October 30 to December 4, 2026).

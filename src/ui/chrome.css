@@ -1,0 +1,90 @@
+/* Chrome around the card: light Mac gray theme. Never inherited by .card-surface (it resets). */
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--chrome-bg);
+  color: var(--chrome-fg);
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.chrome-toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #c8c8c8;
+}
+
+.chrome-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.stack-picker select {
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.card-viewport {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.card-frame {
+  flex: 0 0 auto;
+  border: 1px solid #000000;
+}
+
+.status-line {
+  flex: 0 0 auto;
+  min-height: 16px;
+  padding: 2px 12px;
+  color: #8a1010;
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.message-box {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  padding: 2px 8px;
+  border: 0;
+  border-top: 1px solid #000000;
+  background: #ffffff;
+  color: #000000;
+  font-family: var(--font-script);
+  font-size: 12px;
+}
+
+.message-box:focus-visible {
+  outline: 1px dotted #000000;
+  outline-offset: -3px;
+}
+
+.message-box:disabled,
+.stack-picker select:disabled {
+  color: var(--chrome-muted);
+}

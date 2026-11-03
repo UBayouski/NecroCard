@@ -1,0 +1,25 @@
+/* NecroCard design tokens. Card-surface values are canonical; never change the card size. */
+:root {
+  /* Card geometry (logical pixels) */
+  --card-width: 512px;
+  --card-height: 342px;
+
+  /* 1-bit palette — the only colours allowed on the card surface */
+  --black: #000000;
+  --white: #ffffff;
+
+  /* Chrome (light Mac gray theme) */
+  --chrome-bg: #f0f0f0;
+  --chrome-fg: #1a1a1a;
+  --chrome-muted: #6b6b6b;
+
+  /* Font stacks. Generic fallbacks until retro-skin bundles open-licensed bitmap fonts. */
+  --font-ui: sans-serif;
+  --font-field: sans-serif;
+  --font-script: monospace;
+
+  /* z-index bands (retro-ui: <= 100 for normal content, <= 1000 for modal dialogs) */
+  --z-card-layer: 1;
+  --z-transition-top: 2;
+  --z-dialog: 1000;
+}

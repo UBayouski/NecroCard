@@ -175,3 +175,98 @@ in expression position gave a generic "Expected an expression". All fixed with r
 PASS. Final counts: 279 tests in 11 files, typecheck and lint clean, property tests re-run on extra seeds.
 Two undecided edge cases were left as they are and noted: a keyword at statement start reports Unknown command
 rather than reserved word, and a same-line `else <stmt>` is accepted inside a block that still needs `end if`.
+
+## 2026-11-03 — MCP: Playwright server, and a Kiro guardrail
+Surface: CLI (Auto)
+Features: mcp
+What I asked for: Create .kiro/settings/mcp.json with the Playwright MCP server, confirm it loads, take a screenshot.
+What Kiro did: Refused, correctly. A workspace permission rule blocks the agent from writing under .kiro/settings/,
+and it did not try to route around it via `kiro-cli mcp add`. Instead it verified the launch command on this machine:
+on Windows `npx` resolves to `npx.ps1` and there is no `npx.exe`, so a server launched without a shell would fail;
+the working form is `cmd /c npx -y @playwright/mcp@latest`, with `-y` so a fresh clone does not hang on npx's
+"Ok to proceed?" prompt. It confirmed the package starts, that .gitignore does not exclude the file, and gave me the
+exact JSON to create by hand.
+What changed: The settings file was created outside Kiro from Kiro's own verified content. Worth stating in the
+write-up: the agent cannot edit its own permissions or MCP config, which is the right default, and it spent its effort
+on making the human-created file correct the first time. Tool names auto-approved: browser_navigate and
+browser_take_screenshot only. MCP servers load at session start, so the first use is in the next session.
+Next session: both tools worked. browser_navigate loaded example.com and browser_take_screenshot wrote a PNG without a
+permission prompt. Two follow-ups from Kiro: confirm the server was not also coming from a global ~/.kiro/settings/
+file (it was not; none exists), and ignore the .playwright-mcp/ output folder (done).
+
+## 2026-11-03 — Spec 3: browse-mode (requirements, design, tasks)
+Surface: CLI (Auto)
+Features: spec, steering, mcp, pbt
+What I asked for: A browse-mode spec from BRIEF sections 3, 5 and 8 plus the product, structure and retro-ui
+steering: DOM rendering at 512 by 342 scaled to fit, a DomHost over the existing HostInterface, the four stepped
+transitions, 1-bit dialogs, message wiring with the correct `me`, a stack picker, a message box, and a Playwright MCP
+smoke test.
+What Kiro did: Wrote 1,049 lines across requirements, design and tasks against the real interpreter surface. It
+read the evaluator and noticed that `go` targets are already resolved before `goToCard` is called, so the host does
+no navigation of its own. It kept the whole spec out of src/interp and src/model, named the one place where that
+hurts (host errors carry no line number) and proposed the fix as a separate reviewed change instead of sneaking it
+in. The transition design stayed on the stepped-DOM rule from steering: clip-path and transform in whole logical
+pixels, eleven precomputed 8 by 8 Bayer masks as SVG data URLs for dissolve, frames driven by requestAnimationFrame
+with a time-based index, never a CSS transition. Dialogs are drawn inside the scaled card because showModal() would
+sit in the top layer outside the transform. It also listed five open decisions with defaults rather than deciding
+silently: no line numbers on host errors, name-only `me`, a generic font fallback until retro-skin, message box
+ownership moved from script-editor into this spec, and two new dev dependencies (happy-dom, @playwright/test).
+What changed: All five defaults accepted. My review found four things to fix before Task 1. A real bug: buttons use
+`all: unset` followed by `display: flex`, and author rules beat the user-agent `[hidden] { display: none }` rule, so
+hidden objects would render; the spec needs an explicit hidden rule and a test. A cross-spec conflict: the
+interpreter requirements say `the date` is ISO while browse-mode says HyperCard short form `11/3/26`; keep HyperCard
+and amend the old line. A coverage gap: all three fixtures have empty backgrounds, so background rendering and the
+object to card to background message path must be tested with inline stacks. And Task 1 repeats .gitignore entries
+that already exist. The four property tests (navigation index range, property round-trip, scale bounds, transition
+coverage monotone) carry over the PBT habit from the interpreter spec.
+
+## 2026-11-03 — Spec 3 executed, tasks 1 to 9 (everything but the browser)
+Surface: CLI (Auto)
+Features: spec, steering, hook, pbt
+What I asked for: Apply the four corrections and the font adjustment to the spec first, then run Tasks 1 to 9 and
+stop before the dev server and Playwright steps, reporting test count, deviations from the design, and anything in
+src/interp or src/model it wanted to change but did not.
+What Kiro did: Amended the spec files before writing code, including the two stale lines in the interpreter spec.
+Built scale, object lookup, message context, the four renderers, the stage, transitions, dialogs, DomHost, the
+runtime and the message box with co-located tests: 395 tests in 23 files (116 new), the four property tests at 200
+runs each, typecheck, lint and build clean. It reported eight deviations from its own design instead of silently
+drifting. The important one: the evaluator only exposes a global to a handler that declares it, so a one-line
+message box could not share globals with scripts as REQ-7 asked. Rather than touch the interpreter, it made the
+wrapper declare every identifier in the typed line as global and shifted the line-number remap to match, which is
+also how HyperCard treats message box variables. It also listed five interpreter changes it wanted and did not make,
+and confirmed with git diff that src/interp and src/model are untouched. Dev dependencies added, pinned: happy-dom
+21.0.4, @playwright/test 1.64.1.
+What changed: The "no interpreter changes in this spec" rule held under pressure, which is what makes the reviewer
+agent's PASS from the previous spec still valid. Two of the five interpreter wishes (line numbers on host errors, an
+implicitGlobals option on evaluate so the message box stops rewriting source) are queued as one small reviewed
+change after this spec; the other three are deferred. The save hook ran the suite on every file change; the Stop
+hook ran typecheck and lint before each report. I re-ran the suite myself: 395 passing. npm audit reports 11
+moderate findings, all one transitive minimatch version in dev tooling.
+
+## 2026-11-03 — Spec 3 finished: chrome, e2e, Playwright MCP smoke (tasks 10 to 12)
+Surface: CLI (Auto)
+Features: spec, steering, mcp, pbt
+What I asked for: Bring the spec and retro-ui steering in line with what was built (interim message-box globals,
+load errors labelled with card 1, inline transition and scroll-thumb styles allowed, textarea inside a positioned
+div, frame 11 at 333 ms), then run Tasks 10 to 12, including `npm audit fix` with package.json left unchanged.
+What Kiro did: Updated requirements, design, tasks and retro-ui.md first, plus two more stale design sections it
+found (gestures still described pointer capture). Built the stack picker, chrome CSS and boot code, a committed
+Playwright test, and the final checks: 400 Vitest tests in 24 files, typecheck, lint and build clean, `npm run e2e`
+green. The e2e test failed once on its own selector: `getByLabel('Stack')` also matched the card's
+"HyperCard stack" label, so it switched to the combobox role with an exact name. `npm audit fix` changed nothing:
+all 11 findings are one transitive minimatch in the ESLint chain, and the only offered fixes are major downgrades.
+Kiro's shell tool refused to start the dev server (a guard against long-running commands), and Kiro did not try to
+route around it; I started `npm run dev` myself.
+Playwright MCP smoke, driven by Kiro against http://localhost:5173/?stack=quiz: browser_navigate, then
+browser_snapshot and a browser_evaluate read of `data-card-name` after every browser_click. The accessibility
+snapshot does not expose data attributes, which is why the evaluate step was needed. Cards seen in order:
+Title (index 0) → Q1 → Q2 → Q3 → Results (index 4), `data-busy` back to false each time, status line empty, Results
+text "You survived the Haunted Quiz!". Screenshot: .playwright-mcp/browse-quiz-results.png, copy committed at docs/screenshots/browse-quiz-results.png (card at 2× integer
+scale, roundRect "Try Again" button with its bevel). Console: Vite's two debug lines and one error, a 404 for
+/favicon.ico (the browser's automatic request; there is no favicon yet). No script or page errors.
+Difference from the committed e2e test: same clicks and the same final assertions; the MCP run adds a human-readable
+snapshot trail and a screenshot, while the e2e test also fails on any console error.
+What changed: Browse mode works end to end in a real browser on the first MCP run. The screenshot also makes the
+retro-skin gap visible: field and button text are anti-aliased sans-serif, the accepted fallback until open-licensed
+bitmap fonts land. Small follow-up: add a favicon so the console is clean, or the e2e test's no-console-errors rule
+will trip on a stricter run.

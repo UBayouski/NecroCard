@@ -8,5 +8,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["src", "eslint.config.js"]
+  "include": ["src", "test", "playwright.config.ts", "eslint.config.js"]
 }
