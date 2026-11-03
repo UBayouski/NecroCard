@@ -12,6 +12,7 @@ import { showCardInfo } from './cardMenu.js';
 import { importImage, pickImageFile, type ImportDeps } from './imageImport.js';
 import { bindEditorInput } from './editorInput.js';
 import type { Mode } from './modeToggle.js';
+import type { AgentClient } from '../../summon/agentClient.js';
 
 export interface EditControllerDeps {
   stage: CardStage;
@@ -28,6 +29,8 @@ export interface EditControllerDeps {
   importDeps?: ImportDeps;
   /** Validation after each command; defaults to validate-and-log in DEV builds (REQ-8). */
   validate?: (stack: Stack) => void;
+  /** Explain / Fix agent for the script editors (script-editor REQ-5); defaults to the stub. */
+  agent?: AgentClient;
 }
 
 const devValidate = (stack: Stack) => {
@@ -58,7 +61,7 @@ export class EditController {
       importImage: id => { void this.importInto(id); },
       renameCard: (cardId, name) => this.op(s => s.renameCard(cardId, name), false),
       renameStack: name => this.op(s => s.renameStack(name), false),
-    });
+    }, { agent: deps.agent, status: deps.status });
     this.toolbar = createEditToolbar({
       addButton: () => this.op(s => s.addObject('button')),
       addField: () => this.op(s => s.addObject('field')),
@@ -111,6 +114,7 @@ export class EditController {
     this.unbind?.();
     this.unbind = null;
     this.overlay.el.remove();
+    this.inspector.dispose(); // closes any Expand dialog so its editor is not left in the page
     this.inspector.el.remove();
     this.toolbar.el.remove();
     this.deps.toolbarHost.hidden = true;

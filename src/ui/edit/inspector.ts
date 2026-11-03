@@ -4,7 +4,15 @@ import type { ObjectProp, ScriptOwner } from './commands.js';
 import {
   checkboxControl, infoLine, numberControl, selectControl, textControl, type Control,
 } from './inspectorControls.js';
-import { createPlainScriptSlot, type ScriptEditorSlot } from './scriptSlot.js';
+import { createScriptSlot, type ScriptEditorSlot } from './scriptSlot.js';
+import { createStubAgentClient, type AgentClient } from '../../summon/agentClient.js';
+import { scriptContext } from './scriptContext.js';
+
+/** What every script slot needs from outside: the agent and the app status line. */
+export interface InspectorScriptDeps {
+  agent: AgentClient;
+  status: { show(message: string): void; clear(): void };
+}
 
 /** What the inspector asks the editor to do; every call is one undoable edit. */
 export interface InspectorActions {
@@ -64,10 +72,26 @@ export class Inspector {
   private identity = '';
   private view: InspectorView | null = null;
 
-  constructor(private readonly actions: InspectorActions) {
+  private readonly scriptDeps: InspectorScriptDeps;
+
+  constructor(private readonly actions: InspectorActions, scriptDeps?: Partial<InspectorScriptDeps>) {
     this.el = document.createElement('aside');
     this.el.className = 'inspector font-ui';
     this.el.setAttribute('aria-label', 'Inspector');
+    this.scriptDeps = {
+      agent: scriptDeps?.agent ?? createStubAgentClient(),
+      status: scriptDeps?.status ?? { show: () => {}, clear: () => {} },
+    };
+  }
+
+  /** Release every script slot (closes Expand dialogs, aborts requests); the next show rebuilds. */
+  dispose(): void {
+    for (const s of this.scripts) s.destroy();
+    this.scripts = [];
+    this.bindings = [];
+    this.primaryScript = null;
+    this.identity = '';
+    this.el.replaceChildren();
   }
 
   /** Show a view: rebuild when the subject changes, otherwise re-sync (never the focused control). */
@@ -110,6 +134,7 @@ export class Inspector {
   }
 
   private build(view: InspectorView): void {
+    for (const s of this.scripts) s.destroy(); // close Expand dialogs and abort requests first
     this.bindings = [];
     this.scripts = [];
     this.primaryScript = null;
@@ -120,7 +145,11 @@ export class Inspector {
   }
 
   private script(label: string, owner: (v: InspectorView) => ScriptOwner, read: (v: InspectorView) => string): ScriptEditorSlot {
-    const slot = createPlainScriptSlot(label);
+    const slot = createScriptSlot(label, {
+      agent: this.scriptDeps.agent,
+      status: this.scriptDeps.status,
+      context: () => scriptContext(this.view!, owner(this.view!)),
+    });
     slot.onCommit(src => { if (this.view) this.actions.setScript(owner(this.view), src); });
     this.scripts.push(slot);
     this.bind(slot, read);

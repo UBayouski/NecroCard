@@ -48,8 +48,8 @@ necrocard/
 |---|---|---|
 | `src/model/` | Nothing from `src/` except other `model/` files | `interp/`, `ui/`, `summon/`, `share/` |
 | `src/interp/` | `src/model/` types only | `ui/`, `summon/`, `share/`, `worker/` |
-| `src/ui/` | `src/model/`, `src/interp/` | `src/summon/`, `src/worker/` |
-| `src/summon/` | `src/model/`, `src/interp/` | `src/ui/` internal components |
+| `src/ui/` | `src/model/`, `src/interp/`, `src/summon/` public modules (e.g. `src/summon/agentClient.ts`) | `src/worker/`, non-public `src/summon/` internals |
+| `src/summon/` | `src/model/`, `src/interp/` | `src/ui/` (never, in any form) |
 | `src/share/` | `src/model/` | `src/interp/`, `src/ui/` internals |
 | `src/worker/` | `src/model/`, `src/summon/` | All browser APIs |
 

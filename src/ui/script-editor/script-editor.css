@@ -1,0 +1,313 @@
+/* NecroCard script editor and message box. Chrome styling (never the card's 1-bit rules). */
+
+/* Token colours: colour only — no weight or style changes — so the transparent textarea glyphs and the
+   mirror glyphs keep identical advances. All at least 4.5:1 on #ffffff (checked by a test). */
+.tok-keyword { color: #1f3f8f; }
+.tok-handler { color: #0b5d2a; }
+.tok-string { color: #7a3b00; }
+.tok-number { color: #5b2a86; }
+.tok-comment { color: #5f5f5f; }
+.tok-identifier,
+.tok-operator,
+.tok-punctuation,
+.tok-space { color: #1a1a1a; }
+.tok-invalid { color: #8a1010; text-decoration: underline dotted #8a1010; }
+
+/* Shared text metrics for the textarea, its mirror and the gutter. */
+.code-metrics {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 4px 6px;
+  border: 0;
+  font-family: var(--font-script);
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0;
+  tab-size: 2;
+  white-space: pre;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.code-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.code-editor-body {
+  display: flex;
+  overflow: hidden;
+  resize: vertical;
+  border: 1px solid #8a8a8a;
+  background: #ffffff;
+  min-height: 42px;
+}
+
+/* 10 or 24 visible rows: rows × 16px line height + 8px padding + 2px border */
+.code-editor--rows-10 .code-editor-body { height: 170px; }
+.code-editor--rows-24 .code-editor-body { height: 394px; }
+
+.code-editor-gutter {
+  flex: 0 0 auto;
+  min-width: 3.5ch;
+  padding-left: 4px;
+  padding-right: 4px;
+  overflow: hidden;
+  border-right: 1px solid #d0d0d0;
+  background: #f4f4f4;
+  color: #6b6b6b;
+  text-align: right;
+  user-select: none;
+}
+
+.code-editor-gutter[data-digits="3"] { min-width: 4.5ch; }
+.code-editor-gutter[data-digits="4"] { min-width: 5.5ch; }
+
+.code-gutter-line--error {
+  color: #8a1010;
+}
+
+.code-gutter-mark {
+  margin-right: 2px;
+  font-weight: normal;
+}
+
+.code-editor-text {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.code-editor-mirror,
+.code-editor-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.code-editor-mirror {
+  overflow: hidden;
+  color: #1a1a1a;
+  pointer-events: none;
+}
+
+.code-editor-input {
+  overflow: auto;
+  resize: none;
+  outline: none;
+  background: transparent;
+  color: transparent;
+  caret-color: #000000;
+}
+
+.code-editor-input::selection {
+  /* Translucent so the highlighted mirror text shows through the selection. */
+  background: rgba(201, 211, 238, 0.55);
+  color: transparent;
+}
+
+.code-editor-body:focus-within {
+  outline: 2px solid #1a1a1a;
+  outline-offset: 1px;
+}
+
+.code-editor--readonly .code-editor-body {
+  background: #f7f7f7;
+}
+
+.script-line--error {
+  text-decoration: underline wavy #8a1010;
+  text-decoration-skip-ink: none;
+  text-underline-offset: 2px;
+}
+
+.code-editor-status {
+  min-height: 14px;
+  color: #6b6b6b;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.code-editor-status--error {
+  color: #8a1010;
+}
+
+/* ------------------------------------------------------------------ slot: actions, explanation, diff */
+
+.script-work {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.script-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.script-actions[hidden],
+.script-explanation[hidden],
+.code-editor[hidden],
+.script-actions button[hidden] {
+  display: none;
+}
+
+.script-expand {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+.script-explanation {
+  padding: 6px 8px;
+  border: 1px solid #c8c8c8;
+  background: #ffffff;
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.script-explanation p {
+  margin: 0 0 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diff-view {
+  border: 1px solid #8a8a8a;
+  background: #ffffff;
+  padding: 6px;
+}
+
+.diff-view-heading {
+  margin: 0 0 6px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.diff-view-scroll {
+  max-height: 260px;
+  overflow: auto;
+  margin-bottom: 6px;
+}
+
+.diff-view-table {
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.diff-view-table th {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.diff-view-table td {
+  padding: 0 4px;
+  white-space: pre;
+  vertical-align: top;
+}
+
+.diff-old,
+.diff-new {
+  color: #6b6b6b;
+  text-align: right;
+  user-select: none;
+}
+
+.diff-mark {
+  text-align: center;
+  user-select: none;
+}
+
+.diff-row--del { background: #f6e3e3; }
+.diff-row--del .diff-text { text-decoration: line-through; text-decoration-color: #8a1010; }
+.diff-row--add { background: #e3f1e6; }
+
+.diff-view-empty {
+  margin: 0 0 6px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------------ Expand dialog */
+
+.expand-dialog {
+  width: min(640px, 92vw);
+  max-height: 90vh;
+  padding: 10px 14px 14px;
+  border: 1px solid #1a1a1a;
+  background: var(--chrome-bg);
+  color: var(--chrome-fg);
+  font-size: 12px;
+}
+
+.expand-dialog::backdrop {
+  background: #1a1a1a66;
+}
+
+.expand-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.expand-dialog-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* ------------------------------------------------------------------ message box */
+
+.message-box-wrap {
+  position: relative;
+  flex: 0 0 auto;
+  border-top: 1px solid #000000;
+  background: #ffffff;
+}
+
+.message-box-wrap .message-box {
+  position: relative;
+  display: block;
+  border-top: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: #000000;
+}
+
+.message-box-wrap .message-box:disabled {
+  color: transparent;
+}
+
+.message-box-wrap .message-box::selection {
+  /* Translucent so the highlighted mirror text shows through the selection. */
+  background: rgba(201, 211, 238, 0.55);
+  color: transparent;
+}
+
+.message-box-mirror {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  padding: 2px 8px;
+  box-sizing: border-box;
+  font-family: var(--font-script);
+  font-size: 12px;
+  line-height: 20px;
+  white-space: pre;
+  pointer-events: none;
+}
+
+.message-box-wrap:has(.message-box:disabled) .message-box-mirror,
+.message-box-wrap--disabled .message-box-mirror {
+  opacity: 0.55;
+}

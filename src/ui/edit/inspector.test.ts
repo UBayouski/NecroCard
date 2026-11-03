@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Inspector, type InspectorActions, type InspectorView } from './inspector.js';
-import { parseStatus } from './scriptSlot.js';
+import { findError } from '../script-editor/errors.js';
 import { background, button, field, image, makeStack } from '../browse/testStacks.js';
 
 function actions(): InspectorActions & { calls: unknown[][] } {
@@ -163,14 +163,23 @@ describe('Inspector — object view', () => {
     expect(a.calls[1]).toEqual(['setProp', asset.id, 'src', 'asset-sun']);
   });
 
-  it('shows the parse result under the script', () => {
-    const { stack, btn } = sample();
-    const insp = new Inspector(actions());
-    insp.show(view(stack, btn));
-    expect(insp.el.querySelector('.inspector-script-status')!.textContent).toBe('No errors');
-    change(byLabel(insp.el, 'Script'), 'on mouseUp\n  go nowhere fast\nend mouseUp');
-    expect(insp.el.querySelector('.inspector-script-status')!.textContent).toMatch(/^Line 2: /);
-    expect(parseStatus('')).toBe('No errors');
+  it('shows the parse result under the script, 300 ms after typing', () => {
+    vi.useFakeTimers();
+    try {
+      const { stack, btn } = sample();
+      const insp = new Inspector(actions());
+      insp.show(view(stack, btn));
+      const status = () => insp.el.querySelector('.code-editor [role="status"]')!.textContent;
+      expect(status()).toBe('No errors');
+      const ta = byLabel(insp.el, 'Script');
+      ta.value = 'on mouseUp\n  go nowhere fast\nend mouseUp';
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      vi.advanceTimersByTime(300);
+      expect(status()).toMatch(/^Line 2: /);
+      expect(findError('')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

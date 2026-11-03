@@ -363,3 +363,83 @@ MCP steps in parallel, "Add button" ran before edit mode was ready, and a screen
 redid the flow one step at a time, checking state before each screenshot. One visual note carried to retro-skin:
 the dashed selection outline sits on top of a roundRect button's 2 px border, so only the handles show selection.
 Interpreter and model untouched, no new dependencies.
+
+## 2026-11-03 — Spec 5: script-editor (requirements, design, tasks)
+Surface: CLI (Auto)
+Features: spec, steering, pbt
+What I asked for: A script editor with no new dependencies: highlighting driven by the interpreter's own tokenizer
+with no second lexer, a line gutter, inline parse errors on a debounce, Ctrl+] and Ctrl+[ indent so Tab keeps moving
+focus, message box highlighting and history, and Explain and Fix behind an AgentClient interface with a stub until
+the summon spec provides the real client, with Fix shown as a line diff and applied as one undoable command.
+What Kiro did: 668 lines across the three files and twelve open decisions. The highlighting design is the part
+worth reading: every span is sliced from the source by the token's column rather than taken from its value
+(keywords are lowercased in value), comments are recovered from the gaps because the tokenizer skips exactly
+whitespace and `--` comments, and a test asserts every gap span starts with `--` so a future tokenizer change fails
+loudly rather than mis-colouring. Lines are tokenized one at a time so a half-typed string only marks its own line.
+A property test checks the spans concatenate back to the exact source for both valid scripts and arbitrary strings.
+The mirror layer uses colour only, no bold or italic, so glyph widths match the transparent textarea exactly, and
+every colour was checked against 4.5:1. Indent uses the browser's own insertion path so the textarea's native undo
+still works.
+What changed: Eleven defaults accepted. One overridden: the AgentClient interface moves to src/summon/ rather than
+src/ui/agent/, because the Summon prompt panel in spec 6 will have to call src/summon from the UI anyway, so the
+dependency direction is UI consumes, summon provides, and structure.md is amended once to say so. One addition for
+the demo: an Expand button that moves the same editor element into a wider chrome dialog and back, so state and
+commit rules are untouched.
+
+## 2026-11-03 — Spec 5: script-editor, Chrome findings, e2e and Playwright MCP (tasks 7 and 8)
+Surface: CLI (Auto)
+Features: spec, mcp, pbt, steering
+What I asked for: Fix two findings from my own check in Chrome, then run the script-editor e2e test and one
+Playwright MCP pass of the same flow (one dependent action per call) with screenshots of the inline error and the
+Expand dialog, and close the spec.
+The two Chrome findings (mine, not Kiro's) and how Kiro fixed them:
+1. Selected text was invisible. The textarea's `::selection` used an opaque colour that covered the highlighted
+   mirror behind the transparent text. Kiro switched both the script editor and the message box to
+   `rgba(201, 211, 238, 0.55)`, and added a CSS test that both selection backgrounds have alpha strictly between 0 and
+   1 (the message box had no selection rule at all before).
+2. Ctrl+Z after Ctrl+] selected the whole line, because indent replaced the entire line range in one `insertText`.
+   Kiro changed `shiftLines` so a single-line indent inserts only two spaces at a caret on the line start, and a
+   single-line outdent selects just the leading spaces and runs `execCommand('delete')`; multi-line selections keep
+   the whole-range replace. The unit tests check the exact replacement and the caret after each path, and that the
+   minimal edit reproduces the full result. Since happy-dom cannot run native undo, the editor test records the
+   command and selection the browser would act on.
+What Kiro did: test/e2e/script-editor.spec.ts with four tests, all green in Chromium on the first run: a broken
+handler (`end mouseDown`) shows `Line 3: Expected "end mouseUp" but found "end mouseDown".` within a second, with
+`aria-invalid`, a `!3` gutter marker and the line-3 underline; fixing it gives `No errors`, and clicking in Browse
+reaches Q1. Fix with the stub client puts `Summon is not configured` in the status line. Two tests check the Chrome
+findings in a real browser, which happy-dom could not: Ctrl+] then Ctrl+Z leaves a caret (this would have failed
+before the fix), and the computed `::selection` background on both controls is translucent.
+Playwright MCP run against http://localhost:5173/?stack=quiz, one dependent action per call with a
+browser_evaluate state check before each screenshot. Edit, open BeginButton's script, type the broken handler, wait,
+check, screenshot .playwright-mcp/script-editor-error.png (highlighted code, `!3` gutter marker, wavy underline,
+message below). Expand, check that it is the same textarea (`script-4`), a single `.code-editor` on the page, 24
+rows, error kept; screenshot .playwright-mcp/script-editor-expanded.png. Fix the line inside the dialog, Close: the
+same editor is back in the inspector at 10 rows, `No errors`, focus on the Expand button. Browse, click "Enter if you
+dare...", Q1. Console: 0 errors, 0 warnings (Vite connect lines and two CSS hot-update lines only).
+What changed: The two findings are a fair lesson about what unit tests in a fake DOM can and cannot see: both were
+correct by every happy-dom test and wrong in Chrome. Each now has a real-browser e2e check. The MCP run found one
+more small thing: the Expand dialog's title read "Script: Script" because it used the slot's label; Task 8 changes
+it to name the owner, e.g. `Script of button "BeginButton"`. Also noted: closing the dialog by clicking Close blurs
+the textarea, so the normal blur rule commits the edit (as specified; Close itself commits nothing). The double-click
+that opens the script was dispatched to the edit overlay with browser_evaluate, because an MCP click on the covered
+button's ref fails Playwright's actionability check; the committed e2e test performs a real double-click.
+
+## 2026-11-03 — Spec 5 closed: human check in Chrome, two real-browser bugs, MCP run
+Surface: CLI (Auto)
+Features: spec, mcp, hook
+What I asked for: Tasks 1 to 6, stop, then a human check of the two things Kiro said happy-dom could not prove
+(mirror alignment with the transparent textarea, native undo after the indent shortcut), then the e2e and MCP tasks.
+What Kiro did: 631 Vitest tests in 44 files and 9 e2e tests, all green with typecheck, lint and build. The human
+check in Chrome confirmed alignment and undo, and found two things Kiro had not: selected text vanished because the
+textarea's opaque selection highlight sat above the mirror that carries the coloured text, and Ctrl+Z after Ctrl+]
+selected the whole line because the indent replaced the entire line range in one insertText. Kiro fixed both (a
+translucent selection colour, and single-line indents that insert only the two spaces so native undo leaves a
+caret) and, since happy-dom cannot run native undo, added two e2e tests in real Chromium that would have failed
+before the fixes. The MCP run then drove the broken-handler flow one dependent action per call, screenshotted the
+inline error and the Expand dialog, and found and fixed one more thing: the dialog title read "Script: Script" and
+now names the owner. It also noted a second NecroCard tab it had not opened in the MCP browser and worked only in
+its own.
+What changed: The pattern for this project is now settled: Kiro proves what it can in happy-dom, says plainly what
+it cannot, a human checks that in a real browser, and the fixes come back with real-browser e2e tests so the gap is
+closed for good. Caret position after undo lands at the line start, which is inherent to using the browser's own
+undo stack rather than the editor's, and was accepted. Screenshots copied to docs/screenshots/.

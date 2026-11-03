@@ -3,6 +3,7 @@ import './ui/variables.css';
 import './ui/chrome.css';
 import './ui/browse/browse.css';
 import './ui/edit/edit.css';
+import './ui/script-editor/script-editor.css';
 import { loadFixture, type FixtureName } from './model/fixtures.js';
 import type { Stack } from './model/types.js';
 import { CardStage } from './ui/browse/stage.js';
@@ -11,6 +12,8 @@ import { createStackPicker, fixtureFromSearch, UNTITLED, urlWithFixture } from '
 import { EditController } from './ui/edit/editor.js';
 import { createModeToggle } from './ui/edit/modeToggle.js';
 import { createNewStack } from './ui/edit/newStack.js';
+import { MessageBoxInput } from './ui/script-editor/messageBoxInput.js';
+import { createStubAgentClient } from './summon/agentClient.js';
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -40,12 +43,9 @@ function boot(root: HTMLElement): void {
     clear: () => { statusEl.textContent = ''; },
   };
 
-  const messageBox = document.createElement('input');
-  messageBox.type = 'text';
-  messageBox.className = 'message-box font-script';
-  messageBox.setAttribute('aria-label', 'Message box');
-  messageBox.spellcheck = false;
-  messageBox.autocomplete = 'off';
+  // Highlighted message box with an Up/Down history (script-editor REQ-7).
+  const messageBoxInput = new MessageBoxInput();
+  const messageBox = messageBoxInput.input;
 
   let current: FixtureName | typeof UNTITLED = fixtureFromSearch(location.search);
   const picker = createStackPicker(key => { void loadKey(key); });
@@ -78,6 +78,8 @@ function boot(root: HTMLElement): void {
     inspectorHost: workspace,
     toolbarHost: editToolbarHost,
     onModeChange: mode => toggle.set(mode),
+    // Spec `summon` replaces this one line with the real client.
+    agent: createStubAgentClient(),
   });
 
   /** Load any stack exactly like a fixture: Browse mode, history cleared (REQ-1.4). */
@@ -130,15 +132,17 @@ function boot(root: HTMLElement): void {
   messageBox.addEventListener('keydown', e => {
     if (e.key !== 'Enter' || runtime.isBusy || editor.mode === 'edit') return;
     e.preventDefault();
+    const line = messageBox.value;
+    messageBoxInput.submitted(line);
     // The input is disabled while busy, which drops focus; restore it with the text selected.
-    void runtime.runMessageBox(messageBox.value).then(() => {
+    void runtime.runMessageBox(line).then(() => {
       messageBox.focus();
       messageBox.select();
     });
   });
 
   toolbar.append(title, picker.el, newStackButton, toggle.el);
-  root.replaceChildren(toolbar, editToolbarHost, workspace, statusEl, messageBox);
+  root.replaceChildren(toolbar, editToolbarHost, workspace, statusEl, messageBoxInput.el);
   stage.observe();
   void loadKey(fixtureFromSearch(location.search));
 }

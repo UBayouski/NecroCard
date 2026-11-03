@@ -7,6 +7,7 @@ import { background, button, field, makeStack } from '../browse/testStacks.js';
 import { validateStack } from '../../model/validate.js';
 import type { Stack } from '../../model/types.js';
 import type { ImportDeps } from './imageImport.js';
+import type { AgentClient } from '../../summon/agentClient.js';
 
 const log = (s: string) => `put "${s}," after field "Log"`;
 const handler = (name: string, ...lines: string[]) => `on ${name}\n${lines.map(l => `  ${l}`).join('\n')}\nend ${name}`;
@@ -31,7 +32,7 @@ function sampleStack(): Stack {
   });
 }
 
-function setup(opts: { pickFile?: () => Promise<File | null>; importDeps?: ImportDeps } = {}) {
+function setup(opts: { pickFile?: () => Promise<File | null>; importDeps?: ImportDeps; agent?: AgentClient } = {}) {
   const stage = new CardStage();
   const inspectorHost = document.createElement('div');
   const toolbarHost = document.createElement('div');
@@ -287,5 +288,36 @@ describe('EditController — tools, cards and the handoff to browse mode', () =>
     t.ctrl().enter();
     expect(t.ctrl().session!.history.size).toBe(0);
     expect(t.tool('Undo').disabled).toBe(true);
+  });
+});
+
+describe('EditController — script editor Fix through undo (script-editor REQ-5.4)', () => {
+  it('Apply is one history entry, and Ctrl+Z outside a text control restores the previous script', async () => {
+    const proposal = handler('mouseUp', log('fixed'));
+    const seen: { script: string; error: string | null; owner: string }[] = [];
+    const agent: AgentClient = {
+      explain: async () => 'n/a',
+      fix: async (script, error, context) => { seen.push({ script, error, owner: `${context.owner.type}:${context.owner.name}` }); return proposal; },
+    };
+    const t = setup({ agent });
+    await t.runtime.load(sampleStack());
+    t.ctrl().enter();
+    const go = t.runtime.currentState!.stack.cards[0].objects[0];
+    const original = go.script;
+    t.click(20, 15);
+    const before = t.ctrl().session!.history.size;
+    Array.from(t.inspectorHost.querySelectorAll('button')).find(b => b.textContent === 'Fix')!.click();
+    await new Promise(r => setTimeout(r, 0));
+    expect(seen).toEqual([{ script: original, error: null, owner: 'button:Go' }]);
+    Array.from(t.inspectorHost.querySelectorAll<HTMLButtonElement>('[aria-label="Proposed fix"] button')).find(b => b.textContent === 'Apply')!.click();
+    const card = () => t.runtime.currentState!.stack.cards[0];
+    expect(card().objects[0].script).toBe(proposal);
+    expect(t.ctrl().session!.history.size).toBe(before + 1);
+    expect(t.tool('Undo').title).toBe('Undo Edit script of button "Go"');
+    // Leave the textarea first, as a user would (Ctrl+Z *in* the textarea is its own text undo).
+    t.field('Script').blur();
+    t.key('z', { ctrlKey: true }); // on the body, not in a text control
+    expect(card().objects[0].script).toBe(original);
+    expect(t.field('Script').value).toBe(original);
   });
 });
