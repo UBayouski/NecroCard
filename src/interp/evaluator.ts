@@ -1,5 +1,6 @@
 import { NecroTalkError, formatError } from './errors.js';
 import { resolveNavigation } from './navigation.js';
+import { parseNotes, NoteParseError, type Note } from './notes.js';
 import type {
   ScriptNode, HandlerNode, StatementNode, ExpressionNode,
   BinaryOp, ContainerNode, ObjectRef,
@@ -48,6 +49,10 @@ export interface HostInterface {
 
   // Feedback — synchronous
   beep(): void;
+  /** Play a melody (necrotalk-play). `notes` is already parsed; `tempo` is beats per minute. */
+  play(notes: Note[], tempo: number): void;
+  /** Silence the play voice at once. */
+  stopSound(): void;
 
   // Built-ins — synchronous
   getDate(): string;
@@ -268,6 +273,27 @@ async function executeStatement(stmt: StatementNode, ctx: ExecContext): Promise<
     case 'beep':
       hostCall(line, () => host.beep());
       return;
+
+    case 'play': {
+      if (stmt.action === 'stop') {
+        hostCall(line, () => host.stopSound());
+        return;
+      }
+      const tempo = stmt.tempo === undefined ? 120 : toNumber(evalExpr(stmt.tempo), line);
+      if (!Number.isFinite(tempo) || tempo <= 0) {
+        throw runtimeError(line, `"${tempo}" is not a valid tempo`);
+      }
+      const source = evalExpr(stmt.notes!);
+      let notes: Note[];
+      try {
+        notes = parseNotes(source);
+      } catch (e) {
+        if (e instanceof NoteParseError) throw runtimeError(line, `"${e.token}" is not a note`);
+        throw e;
+      }
+      hostCall(line, () => host.play(notes, tempo));
+      return;
+    }
 
     case 'go': {
       const index = hostCall(line, () => host.getCurrentCardIndex());

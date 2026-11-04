@@ -92,7 +92,7 @@ describe('Inspector — object view', () => {
       ['setProp', btn.id, 'label', 'Flee'],
       ['setProp', btn.id, 'visible', false],
       ['setProp', btn.id, 'style', 'transparent'],
-      ['setScript', { kind: 'object', cardId: stack.cards[0].id, objectId: btn.id }, 'on mouseUp\n  go next\nend mouseUp'],
+      ['setScript', { kind: 'object', target: { kind: 'card', cardId: stack.cards[0].id }, objectId: btn.id }, 'on mouseUp\n  go next\nend mouseUp'],
     ]);
   });
 
@@ -134,7 +134,7 @@ describe('Inspector — object view', () => {
     insp.flush();
     expect(a.calls).toEqual([
       ['setProp', btn.id, 'name', 'Typed'],
-      ['setScript', { kind: 'object', cardId: stack.cards[0].id, objectId: btn.id }, '-- typed'],
+      ['setScript', { kind: 'object', target: { kind: 'card', cardId: stack.cards[0].id }, objectId: btn.id }, '-- typed'],
     ]);
   });
 
@@ -145,6 +145,20 @@ describe('Inspector — object view', () => {
     expect(insp.el.textContent).toContain('Another button on this card has this name; scripts will find the first one.');
     insp.show(view(stack, note));
     expect(insp.el.textContent).not.toContain('Another');
+  });
+
+  it('the duplicate-name check spans card and background when a background object is active (REQ-5.4)', () => {
+    // A background button named like the card's "Go"; selected on the background layer.
+    const shared = button('Go');
+    const stack = makeStack({
+      name: 'Haunt',
+      backgrounds: [background('Main', [shared])],
+      cards: [{ name: 'One', objects: [button('Go')] }],
+    });
+    const insp = new Inspector(actions());
+    insp.show({ kind: 'object', stack, cardIndex: 0, obj: shared, target: { kind: 'background', backgroundId: stack.backgrounds[0].id } });
+    expect(insp.el.querySelector('h2')!.textContent).toBe('Button "Go"');
+    expect(insp.el.textContent).toContain('Another button on this card has this name; scripts will find the first one.');
   });
 
   it('images: data URLs are read-only and truncated; asset ids editable; Import… asks the editor', () => {

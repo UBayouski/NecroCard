@@ -163,6 +163,21 @@ describe('AST types compile and construct', () => {
       throw new Error('Should have narrowed to BeepStatement');
     }
   });
+
+  it('PlayStatement narrows on kind and action', () => {
+    const stop: StatementNode = { kind: 'play', action: 'stop', line: 1 };
+    const notes: StatementNode = {
+      kind: 'play', action: 'notes', line: 2,
+      notes: { kind: 'literal', value: 'c e g' },
+      tempo: { kind: 'literal', value: 160 },
+    };
+    if (stop.kind !== 'play' || notes.kind !== 'play') throw new Error('Should have narrowed to PlayStatement');
+    expect(stop.action).toBe('stop');
+    expect(stop.notes).toBeUndefined();
+    expect(notes.action).toBe('notes');
+    expect(notes.notes).toMatchObject({ kind: 'literal', value: 'c e g' });
+    expect(notes.tempo).toMatchObject({ kind: 'literal', value: 160 });
+  });
 });
 
 describe('NecroTalkError', () => {

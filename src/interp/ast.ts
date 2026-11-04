@@ -63,6 +63,7 @@ export type StatementNode =
   | ShowStatement
   | HideStatement
   | BeepStatement
+  | PlayStatement
   | IfStatement
   | RepeatStatement
   | ExitStatement
@@ -163,6 +164,17 @@ export interface HideStatement {
 
 export interface BeepStatement {
   kind: 'beep';
+  line: number;
+}
+
+/** `play stop` silences; `play [tempo <expr>] <expr>` plays a melody (necrotalk-play REQ-1.3). */
+export interface PlayStatement {
+  kind: 'play';
+  action: 'stop' | 'notes';
+  /** The notes string expression; present when action === 'notes'. */
+  notes?: ExpressionNode;
+  /** Optional tempo (beats per minute) expression; present only with a `tempo` prefix. */
+  tempo?: ExpressionNode;
   line: number;
 }
 

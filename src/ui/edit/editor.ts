@@ -7,6 +7,7 @@ import { backgroundOf } from '../browse/objectOps.js';
 import { EditSession, type SessionEvent } from './session.js';
 import { EditOverlay } from './overlay.js';
 import { Inspector, type InspectorView } from './inspector.js';
+import type { CommandTarget } from './commands.js';
 import { createEditToolbar, type EditToolbar } from './editToolbar.js';
 import { showCardInfo } from './cardMenu.js';
 import { importImage, pickImageFile, type ImportDeps } from './imageImport.js';
@@ -54,6 +55,8 @@ export class EditController {
   readonly toolbar: EditToolbar;
   private unbind: (() => void) | null = null;
   private flushing = false;
+  /** Set by bindEditorInput so toggleBackground can cancel a drag in progress (edit-background REQ-1.3). */
+  cancelDrag: (() => void) | null = null;
 
   constructor(readonly deps: EditControllerDeps) {
     this.inspector = new Inspector({
@@ -75,6 +78,7 @@ export class EditController {
       next: () => this.op(s => s.showCard(s.cardIndex + 1)),
       prev: () => this.op(s => s.showCard(s.cardIndex - 1)),
       cardInfo: () => { void this.cardInfo(); },
+      editBackground: () => this.toggleBackground(),
     });
   }
 
@@ -104,6 +108,7 @@ export class EditController {
     if (this.deps.messageBox) this.deps.messageBox.disabled = true;
     this.unbind = bindEditorInput(this);
     this.refresh({ render: true });
+    this.updateBackgroundIndicator();
     this.deps.onModeChange?.('edit');
     return true;
   }
@@ -122,6 +127,7 @@ export class EditController {
     this.deps.toolbarHost.hidden = true;
     this.mode = 'browse';
     this.deps.stage.setEditing(false);
+    this.deps.stage.setEditingBackground(false);
     if (this.deps.runtime.currentHost) this.host.rerender();
     this.deps.runtime.setMode('browse');
     if (this.deps.messageBox) this.deps.messageBox.disabled = this.deps.runtime.isBusy;
@@ -174,19 +180,41 @@ export class EditController {
     else if (ev.render) this.host.rerender();
     const selected = s.selected();
     this.deps.stage.setSelected(selected?.id ?? null);
-    this.overlay.render(s.stack.cards[s.cardIndex], selected);
+    this.overlay.render(s.activeObjects(), selected);
     this.inspector.show(this.view());
     this.toolbar.setUndo(s.undoLabel());
     this.toolbar.setRedo(s.redoLabel());
     this.toolbar.cardMenu.setCanDelete(s.stack.cards.length > 1);
+    this.toolbar.cardMenu.setEditBackground(s.activeLayer === 'background');
   }
 
   private view(): InspectorView {
     const s = this.session!;
     const obj = s.selected();
-    return obj
-      ? { kind: 'object', stack: s.stack, cardIndex: s.cardIndex, obj }
-      : { kind: 'card', stack: s.stack, cardIndex: s.cardIndex };
+    if (!obj) return { kind: 'card', stack: s.stack, cardIndex: s.cardIndex };
+    const card = s.stack.cards[s.cardIndex];
+    const target: CommandTarget = s.activeLayer === 'background'
+      ? { kind: 'background', backgroundId: card.backgroundId }
+      : { kind: 'card', cardId: card.id };
+    return { kind: 'object', stack: s.stack, cardIndex: s.cardIndex, obj, target };
+  }
+
+  /** Toggle the edited layer (edit-background REQ-1): cancel a drag, commit input, switch, refresh, re-indicate. */
+  toggleBackground(): void {
+    const s = this.session;
+    if (this.mode !== 'edit' || !s) return;
+    this.cancelDrag?.();
+    this.flush();
+    const ev = s.toggleLayer();
+    this.refresh(ev);
+    this.updateBackgroundIndicator();
+  }
+
+  /** Match the title-bar stripe and the menu check to the session's layer. */
+  private updateBackgroundIndicator(): void {
+    const on = this.mode === 'edit' && this.session?.activeLayer === 'background';
+    this.deps.stage.setEditingBackground(on);
+    this.toolbar.cardMenu.setEditBackground(on);
   }
 
   private async pick(): Promise<File | null> {

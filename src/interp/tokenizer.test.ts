@@ -11,6 +11,13 @@ function values(tokens: Token[]): string[] {
 }
 
 describe('tokenize — basic handler', () => {
+  it('play, tempo and stop are keywords; a notes string is a string token', () => {
+    const toks = tokenize('on h\n  play tempo 160 "c e g"\n  play stop\nend h');
+    const kw = toks.filter(t => t.type === 'keyword').map(t => t.value);
+    expect(kw).toEqual(expect.arrayContaining(['play', 'tempo', 'stop']));
+    expect(toks.some(t => t.type === 'string' && t.value === 'c e g')).toBe(true);
+  });
+
   it('tokenizes a minimal handler correctly', () => {
     const src = 'on mouseUp\n  beep\nend mouseUp';
     const toks = tokenize(src);

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { EditSession } from './session.js';
+import { EditSession, type Layer } from './session.js';
 import { isClamped, HANDLES, resizeRect } from './geometry.js';
+import type { CommandTarget } from './commands.js';
 import { createState } from '../browse/state.js';
 import { background, button, field, makeStack } from '../browse/testStacks.js';
 import { loadFixture, type FixtureName } from '../../model/fixtures.js';
@@ -47,7 +48,7 @@ describe('EditSession operations', () => {
     expect(obj.rect.x).toBe(19);
     s.setProp(obj.id, 'label', 'Flee');
     s.setProp(obj.id, 'visible', false);
-    s.setScript({ kind: 'object', cardId: state.stack.cards[0].id, objectId: obj.id }, 'on mouseUp\n  go next\nend mouseUp');
+    s.setScript({ kind: 'object', target: { kind: 'card', cardId: state.stack.cards[0].id }, objectId: obj.id }, 'on mouseUp\n  go next\nend mouseUp');
     expect(obj.script).toContain('go next');
     s.deleteSelected();
     expect(state.stack.cards[0].objects.some(o => o.id === obj.id)).toBe(false);
@@ -126,12 +127,21 @@ describe('EditSession operations', () => {
     expect(state.stack.cards[0].objects.map(o => o.id)).toEqual([go.id, note.id]);
   });
 
-  it('background objects are not editable through the session', () => {
+  it('background objects are not editable from the card layer, but are on the background layer', () => {
     const { s, state } = session(inline());
     const shared = state.stack.backgrounds[0].objects[0];
+    // Card layer (default): the background object is not selectable or editable.
     s.select(shared.id);
     expect(s.selection).toBeNull();
-    expect(() => s.moveTo(shared.id, { x: 0, y: 0, w: 10, h: 10 }, 'move')).toThrow('The object is not on this card');
+    expect(() => s.moveTo(shared.id, { x: 0, y: 0, w: 10, h: 10 }, 'move')).toThrow('The object is not on this layer');
+
+    // Toggle to the background layer: now it is.
+    s.setLayer('background');
+    expect(s.activeObjects().some(o => o.id === shared.id)).toBe(true);
+    s.select(shared.id);
+    expect(s.selection).toBe(shared.id);
+    expect(s.moveTo(shared.id, { x: 1, y: 2, w: 10, h: 10 }, 'move')).not.toBeNull();
+    expect(state.stack.backgrounds[0].objects[0].rect).toMatchObject({ x: 1, y: 2 });
   });
 
   it('background and stack scripts are editable', () => {
@@ -182,11 +192,17 @@ const opArb: fc.Arbitrary<Op> = fc.oneof(
   fc.record({ op: fc.constant('select' as const), pick }),
 );
 
+/** Each op is applied on a randomly chosen active layer (edit-background REQ-7.2). */
+type LayeredOp = { layer: Layer; op: Op };
+const layeredOpArb: fc.Arbitrary<LayeredOp> =
+  fc.record({ layer: fc.constantFrom('card' as const, 'background' as const), op: opArb });
+
 const STYLES = { button: ['rect', 'roundRect', 'transparent'], field: ['rect', 'scrolling', 'transparent'] } as const;
 
-/** Apply one random op through the session API. */
-function runOp(s: EditSession, state: ReturnType<typeof createState>, o: Op): void {
-  const objects = state.stack.cards[state.cardIndex].objects;
+/** Apply one random op on the given layer through the session API. */
+function runOp(s: EditSession, state: ReturnType<typeof createState>, layer: Layer, o: Op): void {
+  s.setLayer(layer);
+  const objects = s.activeObjects();
   const target = objects.length > 0 && 'pick' in o ? objects[o.pick % objects.length] : null;
   switch (o.op) {
     case 'move':
@@ -217,11 +233,14 @@ function runOp(s: EditSession, state: ReturnType<typeof createState>, o: Op): vo
     }
     case 'script': {
       const card = state.stack.cards[state.cardIndex];
+      const objTarget: CommandTarget = layer === 'background'
+        ? { kind: 'background', backgroundId: card.backgroundId }
+        : { kind: 'card', cardId: card.id };
       const owners = [
         { kind: 'card' as const, cardId: card.id },
         { kind: 'background' as const, backgroundId: card.backgroundId },
         { kind: 'stack' as const },
-        ...(target ? [{ kind: 'object' as const, cardId: card.id, objectId: target.id }] : []),
+        ...(target ? [{ kind: 'object' as const, target: objTarget, objectId: target.id }] : []),
       ];
       s.setScript(owners[o.owner % owners.length], o.text);
       return;
@@ -236,23 +255,24 @@ function runOp(s: EditSession, state: ReturnType<typeof createState>, o: Op): vo
 }
 
 function allRectsClamped(stack: Stack, touched: Set<string>): boolean {
-  return stack.cards.every(c => c.objects.every(o => !touched.has(o.id) || isClamped(o.rect)));
+  const all = [...stack.backgrounds.flatMap(b => b.objects), ...stack.cards.flatMap(c => c.objects)];
+  return all.every(o => !touched.has(o.id) || isClamped(o.rect));
 }
 
 describe.each<FixtureName>(['quiz', 'adventure', 'flashcards'])('PBT on the %s fixture', name => {
-  it('random edits keep the stack valid; undo all restores it byte for byte; redo all replays it (200 runs)', async () => {
+  it('random edits on either layer keep the stack valid; undo all restores it byte for byte; redo all replays it (200 runs)', async () => {
     const fixture = await loadFixture(name);
     await fc.assert(
-      fc.asyncProperty(fc.array(opArb, { minLength: 1, maxLength: 30 }), async ops => {
+      fc.asyncProperty(fc.array(layeredOpArb, { minLength: 1, maxLength: 30 }), async ops => {
         const { s, state } = session(fixture);
         const original = serializeStack(state.stack);
         const touched = new Set<string>();
-        for (const o of ops) {
-          runOp(s, state, o);
+        for (const { layer, op: o } of ops) {
+          runOp(s, state, layer, o);
           const sel = s.selection;
           if (sel && (o.op === 'move' || o.op === 'resize' || o.op === 'nudge' || o.op === 'add')) touched.add(sel);
           if (o.op === 'move' || o.op === 'resize') {
-            const objs = state.stack.cards[state.cardIndex].objects;
+            const objs = s.activeObjects();
             if (objs.length) touched.add(objs[o.pick % objs.length].id);
           }
           expect(() => validateStack(state.stack)).not.toThrow();

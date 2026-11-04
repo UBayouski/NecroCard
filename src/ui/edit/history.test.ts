@@ -4,7 +4,7 @@ import type { Command } from './commands.js';
 
 const rect = (x: number) => ({ x, y: 0, w: 10, h: 10 });
 const move = (id: string, from: number, to: number, reason: 'move' | 'nudge' = 'move'): Command =>
-  ({ kind: 'setRect', cardId: 'c', objectId: id, before: rect(from), after: rect(to), reason });
+  ({ kind: 'setRect', target: { kind: 'card', cardId: 'c' }, objectId: id, before: rect(from), after: rect(to), reason });
 const rename = (n: string): Command => ({ kind: 'renameStack', before: 'old', after: n });
 
 describe('History', () => {

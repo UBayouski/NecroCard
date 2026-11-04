@@ -60,6 +60,11 @@ export class BrowseRuntime {
   get currentStack(): Stack | null { return this.state?.stack ?? null; }
   get currentMode(): 'browse' | 'edit' { return this.mode; }
 
+  /** Silence the play voice (necrotalk-play REQ-3.3); no-op when nothing is loaded. */
+  stopSound(): void {
+    this.host?.stopSound();
+  }
+
   /**
    * Browse or edit (edit-mode REQ-1.2). In edit mode no gesture reaches a script, even if the
    * card layer were not inert. Switching modes sends no messages.

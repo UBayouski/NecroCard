@@ -155,6 +155,68 @@ describe('EditController — entering and leaving edit mode', () => {
   });
 });
 
+describe('EditController — edit background (edit-background)', () => {
+  const titleBar = () => document.querySelector<HTMLElement>('.card-window-title')!;
+  const striped = () => titleBar().classList.contains('card-window-title--editing-bg');
+
+  it('Ctrl+B toggles the layer: the background button becomes selectable, the card button does not; the stripe tracks it', async () => {
+    const t = setup();
+    await t.runtime.load(sampleStack());
+    t.ctrl().enter();
+    expect(striped()).toBe(false);
+
+    t.key('b', { ctrlKey: true });
+    expect(t.ctrl().session!.activeLayer).toBe('background');
+    expect(striped()).toBe(true);
+
+    t.click(450, 15); // the background button "Shared"
+    expect(t.inspectorHost.querySelector('h2')!.textContent).toBe('Button "Shared"');
+    t.click(20, 15); // the card button "Go" — now on the inactive layer
+    expect('selectedId' in t.stage.surface.dataset).toBe(false);
+
+    t.key('b', { ctrlKey: true });
+    expect(t.ctrl().session!.activeLayer).toBe('card');
+    expect(striped()).toBe(false);
+    t.click(20, 15); // the card button is selectable again
+    expect(t.stage.surface.dataset.selectedId).toBe(t.runtime.currentState!.stack.cards[0].objects[0].id);
+  });
+
+  it('the menu Edit Background item is checked while on, and the stripe clears on leaving Edit', async () => {
+    const t = setup();
+    await t.runtime.load(sampleStack());
+    t.ctrl().enter();
+    const bgItem = () => Array.from(t.toolbarHost.querySelectorAll('[role="menuitemcheckbox"]'))
+      .find(b => b.textContent?.includes('Edit Background'))!;
+    expect(bgItem().getAttribute('aria-checked')).toBe('false');
+    t.ctrl().toggleBackground();
+    expect(bgItem().getAttribute('aria-checked')).toBe('true');
+    expect(striped()).toBe(true);
+    t.ctrl().exit();
+    expect(striped()).toBe(false);
+  });
+
+  it('a background edit is kept across cards, and a rename while on keeps the stripe', async () => {
+    const t = setup();
+    await t.runtime.load(sampleStack());
+    t.ctrl().enter();
+    t.ctrl().toggleBackground();
+    t.ctrl().op(s => s.addObject('button')); // lands on the background, selected
+    const added = t.ctrl().session!.selected()!;
+    // Visible on the other card too (shared background).
+    t.ctrl().op(s => s.showCard(1));
+    expect(t.runtime.currentState!.stack.cards[1].backgroundId)
+      .toBe(t.runtime.currentState!.stack.cards[0].backgroundId);
+    expect(t.runtime.currentState!.stack.backgrounds[0].objects.some(o => o.id === added.id)).toBe(true);
+    expect(t.ctrl().session!.activeLayer).toBe('background'); // kept across navigation
+    // Rename the stack while on the background layer, then simulate the title update that main.ts's onChange
+    // performs (stage.setTitle). setTitle must not rebuild the title bar, so the stripe class survives.
+    t.ctrl().op(s => s.renameStack('Renamed Deck'), false);
+    t.stage.setTitle('Renamed Deck');
+    expect(titleBar().querySelector('.card-window-title-label')!.textContent).toBe('Renamed Deck');
+    expect(striped()).toBe(true);
+  });
+});
+
 describe('EditController — move, resize, nudge, delete, undo', () => {
   it('a drag is one history entry with an integer rect; a plain click records nothing', async () => {
     const t = setup();

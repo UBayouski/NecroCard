@@ -370,6 +370,54 @@ describe('parser — ask', () => {
 // Task 7: Printer
 // ---------------------------------------------------------------------------
 
+describe('play statement (necrotalk-play)', () => {
+  const play = (src: string) => firstStmt(`on h\n  ${src}\nend h`);
+
+  it('parses play stop', () => {
+    const s = play('play stop');
+    expect(s).toMatchObject({ kind: 'play', action: 'stop' });
+    expect('notes' in s && s.notes).toBeFalsy();
+  });
+
+  it('parses play with a notes string and no tempo', () => {
+    const s = play('play "c e g"');
+    expect(s.kind).toBe('play');
+    if (s.kind !== 'play') return;
+    expect(s.action).toBe('notes');
+    expect(s.tempo).toBeUndefined();
+    expect(s.notes).toMatchObject({ kind: 'literal', value: 'c e g' });
+  });
+
+  it('parses play tempo <expr> <expr>', () => {
+    const s = play('play tempo 160 "c e g"');
+    expect(s.kind).toBe('play');
+    if (s.kind !== 'play') return;
+    expect(s.tempo).toMatchObject({ kind: 'literal', value: 160 });
+    expect(s.notes).toMatchObject({ kind: 'literal', value: 'c e g' });
+  });
+
+  it('the notes operand is a full expression (a variable)', () => {
+    const s = play('play theTune');
+    if (s.kind !== 'play') throw new Error('not a play');
+    expect(s.notes).toMatchObject({ kind: 'variable', name: 'thetune' });
+  });
+
+  it('play with no operand is a parse error', () => {
+    expect(() => parse('on h\n  play\nend h')).toThrow(NecroTalkError);
+  });
+
+  it('play tempo with no notes operand is a parse error', () => {
+    expect(() => parse('on h\n  play tempo 160\nend h')).toThrow(NecroTalkError);
+  });
+
+  it('round-trips each form through print', () => {
+    for (const src of ['play stop', 'play "c e g"', 'play tempo 160 "c e g"', 'play theTune']) {
+      const script = parse(`on h\n  ${src}\nend h\n`);
+      expect(stripPositions(parse(print(script)))).toEqual(stripPositions(script));
+    }
+  });
+});
+
 describe('printer — basic', () => {
   it('prints a simple beep handler', () => {
     const script = parse('on mouseUp\n  beep\nend mouseUp\n');

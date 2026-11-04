@@ -54,7 +54,18 @@ describe('grammar summary', () => {
   });
 
   it('names the unsupported features', () => {
-    for (const word of ['do', 'sort', 'send', 'find', 'play', 'item']) expect(GRAMMAR_SUMMARY).toMatch(new RegExp(`\\b${word}\\b`));
+    for (const word of ['do', 'sort', 'send', 'find', 'item']) expect(GRAMMAR_SUMMARY).toMatch(new RegExp(`\\b${word}\\b`));
+  });
+
+  it('documents play as supported, and its notes string parses', async () => {
+    expect(GRAMMAR_SUMMARY).toMatch(/\bplay\b/);
+    // play must not appear on the "Not supported" line.
+    const unsupportedLine = GRAMMAR_SUMMARY.split('\n').find(l => l.startsWith('Not supported'))!;
+    expect(unsupportedLine).not.toMatch(/\bplay\b/);
+    const { parseNotes } = await import('../interp/notes.js');
+    const example = GRAMMAR_EXAMPLES.find(e => e.script.includes('play'))!;
+    const notes = /play "([^"]*)"/.exec(example.script)![1];
+    expect(() => parseNotes(notes)).not.toThrow();
   });
 });
 

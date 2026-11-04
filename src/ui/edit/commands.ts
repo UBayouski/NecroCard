@@ -5,20 +5,25 @@ export type ObjectProp =
   | 'name' | 'visible' | 'style' | 'label' | 'autoHilite' | 'text' | 'lockText' | 'src';
 
 export type ScriptOwner =
-  | { kind: 'object'; cardId: string; objectId: string }
+  | { kind: 'object'; target: CommandTarget; objectId: string }
   | { kind: 'card'; cardId: string }
   | { kind: 'background'; backgroundId: string }
   | { kind: 'stack' };
 
 export type RectReason = 'move' | 'resize' | 'nudge' | 'inspector';
 
+/** The layer that holds an object: a card's objects or a background's objects. */
+export type CommandTarget =
+  | { kind: 'card'; cardId: string }
+  | { kind: 'background'; backgroundId: string };
+
 /** Every edit, naming its targets by id and carrying before and after values. */
 export type Command =
-  | { kind: 'setRect'; cardId: string; objectId: string; before: Rect; after: Rect; reason: RectReason }
-  | { kind: 'setProp'; cardId: string; objectId: string; prop: ObjectProp; before: string | boolean; after: string | boolean }
+  | { kind: 'setRect'; target: CommandTarget; objectId: string; before: Rect; after: Rect; reason: RectReason }
+  | { kind: 'setProp'; target: CommandTarget; objectId: string; prop: ObjectProp; before: string | boolean; after: string | boolean }
   | { kind: 'setScript'; owner: ScriptOwner; before: string; after: string }
-  | { kind: 'addObject'; cardId: string; index: number; object: CardObject }
-  | { kind: 'removeObject'; cardId: string; index: number; object: CardObject }
+  | { kind: 'addObject'; target: CommandTarget; index: number; object: CardObject }
+  | { kind: 'removeObject'; target: CommandTarget; index: number; object: CardObject }
   | { kind: 'insertCard'; index: number; card: Card }
   | { kind: 'removeCard'; index: number; card: Card }
   | { kind: 'renameCard'; cardId: string; before: string; after: string }
@@ -54,8 +59,16 @@ function cardById(stack: Stack, cardId: string): Card {
   return card;
 }
 
-function objectById(stack: Stack, cardId: string, objectId: string): CardObject {
-  const obj = cardById(stack, cardId).objects.find(o => o.id === objectId);
+/** The objects array of a command target's container (a card or a background). */
+function containerObjects(stack: Stack, target: CommandTarget): CardObject[] {
+  if (target.kind === 'card') return cardById(stack, target.cardId).objects;
+  const bg = stack.backgrounds.find(b => b.id === target.backgroundId);
+  if (!bg) throw new CommandError('The background no longer exists');
+  return bg.objects;
+}
+
+function objectInTarget(stack: Stack, target: CommandTarget, objectId: string): CardObject {
+  const obj = containerObjects(stack, target).find(o => o.id === objectId);
   if (!obj) throw new CommandError('The object no longer exists');
   return obj;
 }
@@ -64,12 +77,12 @@ function objectById(stack: Stack, cardId: string, objectId: string): CardObject 
 export function applyCommand(stack: Stack, cmd: Command): void {
   switch (cmd.kind) {
     case 'setRect': {
-      const obj = objectById(stack, cmd.cardId, cmd.objectId);
+      const obj = objectInTarget(stack, cmd.target, cmd.objectId);
       obj.rect = structuredClone(cmd.after);
       return;
     }
     case 'setProp': {
-      const obj = objectById(stack, cmd.cardId, cmd.objectId);
+      const obj = objectInTarget(stack, cmd.target, cmd.objectId);
       if (!acceptsProp(obj.type, cmd.prop, cmd.after)) {
         throw new CommandError(`A ${obj.type} has no ${cmd.prop} that can be set to ${JSON.stringify(cmd.after)}`);
       }
@@ -78,7 +91,7 @@ export function applyCommand(stack: Stack, cmd: Command): void {
     }
     case 'setScript': {
       const o = cmd.owner;
-      if (o.kind === 'object') objectById(stack, o.cardId, o.objectId).script = cmd.after;
+      if (o.kind === 'object') objectInTarget(stack, o.target, o.objectId).script = cmd.after;
       else if (o.kind === 'card') cardById(stack, o.cardId).script = cmd.after;
       else if (o.kind === 'background') {
         const bg = stack.backgrounds.find(b => b.id === o.backgroundId);
@@ -88,15 +101,15 @@ export function applyCommand(stack: Stack, cmd: Command): void {
       return;
     }
     case 'addObject': {
-      const card = cardById(stack, cmd.cardId);
-      if (cmd.index < 0 || cmd.index > card.objects.length) throw new CommandError('The object position is out of range');
-      card.objects.splice(cmd.index, 0, structuredClone(cmd.object));
+      const objects = containerObjects(stack, cmd.target);
+      if (cmd.index < 0 || cmd.index > objects.length) throw new CommandError('The object position is out of range');
+      objects.splice(cmd.index, 0, structuredClone(cmd.object));
       return;
     }
     case 'removeObject': {
-      const card = cardById(stack, cmd.cardId);
-      if (card.objects[cmd.index]?.id !== cmd.object.id) throw new CommandError('The object is not where it was');
-      card.objects.splice(cmd.index, 1);
+      const objects = containerObjects(stack, cmd.target);
+      if (objects[cmd.index]?.id !== cmd.object.id) throw new CommandError('The object is not where it was');
+      objects.splice(cmd.index, 1);
       return;
     }
     case 'insertCard': {
@@ -142,9 +155,17 @@ export function invertCommand(cmd: Command): Command {
 
 const TITLE: Record<CardObject['type'], string> = { button: 'Button', field: 'Field', image: 'Image' };
 
-function objectLabel(stack: Stack, cardId: string, objectId: string, fallback?: CardObject): string {
-  const obj = stack.cards.find(c => c.id === cardId)?.objects.find(o => o.id === objectId) ?? fallback;
-  return obj ? `${TITLE[obj.type].toLowerCase()} "${obj.name}"` : 'object';
+function objectInTargetOrNull(stack: Stack, target: CommandTarget, objectId: string): CardObject | undefined {
+  const objects = target.kind === 'card'
+    ? stack.cards.find(c => c.id === target.cardId)?.objects
+    : stack.backgrounds.find(b => b.id === target.backgroundId)?.objects;
+  return objects?.find(o => o.id === objectId);
+}
+
+function objectLabel(stack: Stack, target: CommandTarget, objectId: string, fallback?: CardObject): string {
+  const obj = objectInTargetOrNull(stack, target, objectId) ?? fallback;
+  const base = obj ? `${TITLE[obj.type].toLowerCase()} "${obj.name}"` : 'object';
+  return target.kind === 'background' ? `${base} (background)` : base;
 }
 
 /** Short human description for undo/redo button titles, e.g. `Move button "Button 1"`. */
@@ -152,19 +173,19 @@ export function describeCommand(cmd: Command, stack: Stack): string {
   switch (cmd.kind) {
     case 'setRect': {
       const verb = { move: 'Move', resize: 'Resize', nudge: 'Nudge', inspector: 'Change size of' }[cmd.reason];
-      return `${verb} ${objectLabel(stack, cmd.cardId, cmd.objectId)}`;
+      return `${verb} ${objectLabel(stack, cmd.target, cmd.objectId)}`;
     }
     case 'setProp':
-      return `Change ${cmd.prop} of ${objectLabel(stack, cmd.cardId, cmd.objectId)}`;
+      return `Change ${cmd.prop} of ${objectLabel(stack, cmd.target, cmd.objectId)}`;
     case 'setScript': {
       const o = cmd.owner;
-      if (o.kind === 'object') return `Edit script of ${objectLabel(stack, o.cardId, o.objectId)}`;
+      if (o.kind === 'object') return `Edit script of ${objectLabel(stack, o.target, o.objectId)}`;
       return `Edit ${o.kind} script`;
     }
     case 'addObject':
-      return `Add ${objectLabel(stack, cmd.cardId, cmd.object.id, cmd.object)}`;
+      return `Add ${objectLabel(stack, cmd.target, cmd.object.id, cmd.object)}`;
     case 'removeObject':
-      return `Delete ${objectLabel(stack, cmd.cardId, cmd.object.id, cmd.object)}`;
+      return `Delete ${objectLabel(stack, cmd.target, cmd.object.id, cmd.object)}`;
     case 'insertCard':
       return 'New Card';
     case 'removeCard':

@@ -1,5 +1,6 @@
 import type { CardObject } from '../../model/types.js';
 import type { HostInterface, ResolvedObjectRef } from '../../interp/evaluator.js';
+import type { Note } from '../../interp/notes.js';
 import { findField, findObject, getProp, setProp, setVisibility } from './objectOps.js';
 import { findObjectById } from './messageContext.js';
 import { renderCard, updateObjectEl, type RenderedCard } from './renderCard.js';
@@ -19,28 +20,118 @@ export interface DomHostOptions {
   dialogInert?: () => HTMLElement[];
   /** Override the beep (tests). */
   beep?: () => void;
+  /** Override play / stopSound (tests). */
+  play?: (notes: Note[], tempo: number) => void;
+  stopSound?: () => void;
   /** Called when a person types into an unlocked field in Browse (never for a script's change); for autosave. */
   onFieldEdited?: () => void;
 }
 
 let audio: AudioContext | null = null;
 
-/** ~100 ms square-wave beep; silent if Web Audio is unavailable or blocked. */
+/**
+ * Register the one-time gesture listener that creates and resumes the shared AudioContext (necrotalk-play §5.3).
+ * The context is created only inside the listener, never eagerly: creating one before any user gesture makes
+ * Chrome log "The AudioContext was not allowed to start". Runs at module load; before the first gesture `audio`
+ * is null, so `beep`/`play` are silent — matching the browser's own autoplay gate.
+ */
+function bindGesture(): void {
+  if (typeof globalThis.addEventListener !== 'function') return;
+  const start = () => {
+    try {
+      const Ctor = globalThis.AudioContext;
+      if (Ctor) {
+        audio ??= new Ctor();
+        void audio.resume().catch(() => { /* resume may reject; sound is feedback only */ });
+      }
+    } catch { /* audio unavailable */ }
+    removeEventListener('pointerdown', start);
+    removeEventListener('keydown', start);
+  };
+  addEventListener('pointerdown', start);
+  addEventListener('keydown', start);
+}
+bindGesture();
+
+/** The shared AudioContext, or null before the first gesture / when Web Audio is unavailable. */
+function ensureAudio(): AudioContext | null {
+  return audio;
+}
+
+const PLAY_GAIN = 0.1;        // the beep's volume
+const NOTE_GAP = 0.01;        // 10 ms silence between notes (necrotalk-play REQ-4.1)
+const ATTACK = 0.005, RELEASE = 0.01;
+
+interface Voice { osc: OscillatorNode; gain: GainNode }
+let voices: Voice[] = [];
+
+/** ~100 ms square-wave beep; silent before the first gesture or if Web Audio is unavailable. */
 function webAudioBeep(): void {
+  const ctx = ensureAudio();
+  if (!ctx) return;
   try {
-    const Ctor = globalThis.AudioContext;
-    if (!Ctor) return;
-    audio ??= new Ctor();
-    const osc = audio.createOscillator();
-    const gain = audio.createGain();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
     osc.type = 'square';
     osc.frequency.value = 880;
-    gain.gain.value = 0.1;
-    osc.connect(gain).connect(audio.destination);
+    gain.gain.value = PLAY_GAIN;
+    osc.connect(gain).connect(ctx.destination);
     osc.start();
-    osc.stop(audio.currentTime + 0.1);
+    osc.stop(ctx.currentTime + 0.1);
   } catch {
     // Beep is feedback only; ignore audio failures.
+  }
+}
+
+/** Silence every scheduled voice through its gain, then release the oscillator (necrotalk-play §5.2). */
+function stopSound(): void {
+  const ctx = audio;
+  for (const { osc, gain } of voices) {
+    try {
+      if (ctx) {
+        gain.gain.cancelScheduledValues(ctx.currentTime);
+        gain.gain.setValueAtTime(0, ctx.currentTime);
+      }
+      gain.disconnect();
+    } catch { /* already torn down */ }
+    try { osc.stop(); } catch { /* its scheduled stop already ran */ }
+  }
+  voices = [];
+}
+
+/** Schedule a melody (necrotalk-play §5.1). Replaces any melody in progress. Silent before the first gesture. */
+function playNotes(notes: readonly Note[], tempo: number): void {
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  try {
+    stopSound();
+    let t = ctx.currentTime;
+    for (const note of notes) {
+      const dur = note.beats * 60 / tempo;
+      if (note.frequency !== null) {
+        const sound = Math.max(dur / 2, dur - NOTE_GAP);
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.value = note.frequency;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(PLAY_GAIN, t + ATTACK);
+        gain.gain.setValueAtTime(PLAY_GAIN, t + Math.max(ATTACK, sound - RELEASE));
+        gain.gain.linearRampToValueAtTime(0, t + sound);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + sound);
+        const voice: Voice = { osc, gain };
+        voices.push(voice);
+        osc.onended = () => {
+          const i = voices.indexOf(voice);
+          if (i >= 0) voices.splice(i, 1);
+        };
+      }
+      t += dur;
+    }
+  } catch {
+    // Play is feedback only; ignore audio failures.
   }
 }
 
@@ -168,6 +259,14 @@ export class DomHost implements HostInterface {
 
   beep(): void {
     (this.options.beep ?? webAudioBeep)();
+  }
+
+  play(notes: Note[], tempo: number): void {
+    (this.options.play ?? playNotes)(notes, tempo);
+  }
+
+  stopSound(): void {
+    (this.options.stopSound ?? stopSound)();
   }
 
   getDate(): string {

@@ -11,7 +11,11 @@ export function scriptContext(view: { stack: Stack; cardIndex: number }, owner: 
   const objectNames = [...card.objects, ...bg.objects].map(o => ({ type: o.type, name: o.name }));
   switch (owner.kind) {
     case 'object': {
-      const obj = stack.cards.find(c => c.id === owner.cardId)?.objects.find(o => o.id === owner.objectId);
+      const t = owner.target;
+      const objects = t.kind === 'card'
+        ? stack.cards.find(c => c.id === t.cardId)?.objects
+        : stack.backgrounds.find(b => b.id === t.backgroundId)?.objects;
+      const obj = objects?.find(o => o.id === owner.objectId);
       return {
         owner: { type: obj?.type ?? 'button', name: obj?.name ?? '' },
         stackName: stack.name, cardName: card.name, backgroundName: bg.name, objectNames,

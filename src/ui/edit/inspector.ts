@@ -1,6 +1,6 @@
 import type { CardObject, Rect, Stack } from '../../model/types.js';
 import { backgroundOf } from '../browse/objectOps.js';
-import type { ObjectProp, ScriptOwner } from './commands.js';
+import type { ObjectProp, CommandTarget, ScriptOwner } from './commands.js';
 import {
   checkboxControl, infoLine, numberControl, selectControl, textControl, type Control,
 } from './inspectorControls.js';
@@ -25,7 +25,7 @@ export interface InspectorActions {
 }
 
 export type InspectorView =
-  | { kind: 'object'; stack: Stack; cardIndex: number; obj: CardObject }
+  | { kind: 'object'; stack: Stack; cardIndex: number; obj: CardObject; target?: CommandTarget }
   | { kind: 'card'; stack: Stack; cardIndex: number };
 
 const TITLE: Record<CardObject['type'], string> = { button: 'Button', field: 'Field', image: 'Image' };
@@ -46,8 +46,13 @@ function heading(level: 2 | 3, text: string): HTMLElement {
 
 function objectOf(view: InspectorView): CardObject {
   if (view.kind !== 'object') throw new Error('No object selected');
-  // Always re-read from the stack so a stale reference never leaks after undo/redo.
-  return view.stack.cards[view.cardIndex].objects.find(o => o.id === view.obj.id) ?? view.obj;
+  // Always re-read from the stack so a stale reference never leaks after undo/redo. On the background layer the
+  // selected object lives on the background, so look there too.
+  const card = view.stack.cards[view.cardIndex];
+  const onCard = card.objects.find(o => o.id === view.obj.id);
+  if (onCard) return onCard;
+  const onBg = backgroundOf(view.stack, card).objects.find(o => o.id === view.obj.id);
+  return onBg ?? view.obj;
 }
 
 /** Other objects on this card or its background with the same name (case-insensitive). */
@@ -209,8 +214,9 @@ export class Inspector {
       this.buildImageSource(section, id);
     }
 
-    const cardId = view.stack.cards[view.cardIndex].id;
-    this.primaryScript = this.script('Script', () => ({ kind: 'object', cardId, objectId: id }), v => objectOf(v).script);
+    const defaultTarget: CommandTarget = { kind: 'card', cardId: view.stack.cards[view.cardIndex].id };
+    const target = view.kind === 'object' && view.target ? view.target : defaultTarget;
+    this.primaryScript = this.script('Script', () => ({ kind: 'object', target, objectId: id }), v => objectOf(v).script);
     section.append(this.primaryScript.el);
     this.el.append(section);
   }

@@ -73,7 +73,7 @@
           "type": "button",
           "rect": { "x": 32, "y": 218, "w": 100, "h": 28 },
           "visible": true,
-          "script": "on mouseUp\n  show field \"Answer\"\nend mouseUp",
+          "script": "on mouseUp\n  play \"c5s\"\n  show field \"Answer\"\nend mouseUp",
           "style": "rect",
           "label": "Flip",
           "autoHilite": true
@@ -136,7 +136,7 @@
           "type": "button",
           "rect": { "x": 32, "y": 218, "w": 100, "h": 28 },
           "visible": true,
-          "script": "on mouseUp\n  show field \"Answer\"\nend mouseUp",
+          "script": "on mouseUp\n  play \"c5s\"\n  show field \"Answer\"\nend mouseUp",
           "style": "rect",
           "label": "Flip",
           "autoHilite": true
@@ -199,7 +199,7 @@
           "type": "button",
           "rect": { "x": 32, "y": 218, "w": 100, "h": 28 },
           "visible": true,
-          "script": "on mouseUp\n  show field \"Answer\"\nend mouseUp",
+          "script": "on mouseUp\n  play \"c5s\"\n  show field \"Answer\"\nend mouseUp",
           "style": "rect",
           "label": "Flip",
           "autoHilite": true
@@ -262,7 +262,7 @@
           "type": "button",
           "rect": { "x": 32, "y": 218, "w": 100, "h": 28 },
           "visible": true,
-          "script": "on mouseUp\n  show field \"Answer\"\nend mouseUp",
+          "script": "on mouseUp\n  play \"c5s\"\n  show field \"Answer\"\nend mouseUp",
           "style": "rect",
           "label": "Flip",
           "autoHilite": true

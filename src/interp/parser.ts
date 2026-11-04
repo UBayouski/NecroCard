@@ -5,7 +5,7 @@ import type {
   ScriptNode, HandlerNode, StatementNode, ExpressionNode,
   GoStatement, GoTarget, VisualEffectStatement,
   PutStatement, GetStatement, SetStatement, GlobalStatement,
-  AnswerStatement, AskStatement, ShowStatement, HideStatement, BeepStatement,
+  AnswerStatement, AskStatement, ShowStatement, HideStatement, BeepStatement, PlayStatement,
   IfStatement, RepeatStatement, RepeatVariant,
   ExitStatement, NextRepeatStatement, PassStatement, CallStatement,
   LiteralExpression, VariableExpression, BinaryExpression, BinaryOp,
@@ -208,6 +208,17 @@ class Parser {
           this.advance();
           this.expectNewlineOrEof();
           return { kind: 'beep', line } satisfies BeepStatement;
+        }
+        case 'play': {
+          this.advance();
+          if (this.matchKeyword('stop')) {
+            this.expectNewlineOrEof();
+            return { kind: 'play', action: 'stop', line } satisfies PlayStatement;
+          }
+          const tempo = this.matchKeyword('tempo') ? this.parseExpression() : undefined;
+          const notes = this.parseExpression();
+          this.expectNewlineOrEof();
+          return { kind: 'play', action: 'notes', notes, tempo, line } satisfies PlayStatement;
         }
         case 'if': return this.parseIf();
         case 'repeat': return this.parseRepeat();
@@ -939,6 +950,11 @@ function printStatement(stmt: StatementNode, depth: number): string[] {
   const i = ind(depth);
   switch (stmt.kind) {
     case 'beep': return [`${i}beep`];
+    case 'play': {
+      if (stmt.action === 'stop') return [`${i}play stop`];
+      const t = stmt.tempo ? `tempo ${printExpr(stmt.tempo)} ` : '';
+      return [`${i}play ${t}${printExpr(stmt.notes!)}`];
+    }
     case 'go': return [`${i}go ${printGoTarget(stmt.target)}`];
     case 'visualEffect': return [`${i}visual effect ${stmt.effect}`];
     case 'put': return [`${i}put ${printExpr(stmt.value)} ${stmt.mode} ${printContainer(stmt.target)}`];

@@ -22,6 +22,8 @@ class MockHost implements HostInterface {
   getFieldText(_r: ResolvedObjectRef) { return ''; }
   setFieldText(_r: ResolvedObjectRef, _t: string) {}
   beep() { this.beepCount++; }
+  play() {}
+  stopSound() {}
   getDate() { return ''; }
   getTime() { return ''; }
   random(_n: number) { return 1; }

@@ -146,7 +146,7 @@ describe('scriptContext', () => {
     });
     const view = { stack, cardIndex: 0 };
     const card = stack.cards[0];
-    expect(scriptContext(view, { kind: 'object', cardId: card.id, objectId: go.id })).toEqual({
+    expect(scriptContext(view, { kind: 'object', target: { kind: 'card', cardId: card.id }, objectId: go.id })).toEqual({
       owner: { type: 'button', name: 'Go' }, stackName: 'Haunt', cardName: 'One', backgroundName: 'Main',
       objectNames: [{ type: 'button', name: 'Go' }, { type: 'field', name: 'Log' }],
     });

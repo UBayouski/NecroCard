@@ -23,7 +23,7 @@ export function bindEditorInput(ctrl: EditController): () => void {
   const logical = (e: PointerEvent | MouseEvent) =>
     clientToLogical(e, stage.surface.getBoundingClientRect(), stage.currentScale);
 
-  const card = () => ctrl.session!.stack.cards[ctrl.session!.cardIndex];
+  const active = () => ctrl.session!.activeObjects();
 
   const preview = (d: Drag, rect: { x: number; y: number; w: number; h: number }) => {
     const el = ctrl.host.elementFor(d.id);
@@ -56,7 +56,7 @@ export function bindEditorInput(ctrl: EditController): () => void {
       ctrl.flush();
       drag = { kind: 'resize', id: selected.id, handle, start: { ...selected.rect }, startClient };
     } else {
-      const hit = hitTest(card().objects, p.x, p.y);
+      const hit = hitTest(active(), p.x, p.y);
       selectOnly(hit?.id ?? null);
       drag = hit ? { kind: 'move', id: hit.id, start: { ...hit.rect }, startClient } : null;
     }
@@ -81,7 +81,7 @@ export function bindEditorInput(ctrl: EditController): () => void {
   const onDoubleClick = (e: MouseEvent) => {
     if (!ctrl.session) return;
     const p = logical(e);
-    const hit = hitTest(card().objects, p.x, p.y);
+    const hit = hitTest(active(), p.x, p.y);
     if (!hit) return;
     selectOnly(hit.id);
     ctrl.inspector.focusScript();
@@ -98,6 +98,12 @@ export function bindEditorInput(ctrl: EditController): () => void {
       if (editable) return; // native text undo inside inputs
       e.preventDefault();
       ctrl.op(ss => ((key === 'z' && !e.shiftKey) ? ss.undo() : ss.redo()));
+      return;
+    }
+    if (mod && key === 'b' && !e.shiftKey && !e.altKey) {
+      if (editable) return; // leave the browser's Ctrl+B to text controls
+      e.preventDefault(); // only when consumed in Edit mode (edit-background REQ-1.1)
+      ctrl.toggleBackground();
       return;
     }
     if (editable) return;
@@ -121,7 +127,7 @@ export function bindEditorInput(ctrl: EditController): () => void {
       const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
       ctrl.op(ss => ss.nudge(dx, dy));
     } else if (e.key === 'Tab' && e.target === stage.surface && !mod && !e.altKey) {
-      const objects = card().objects;
+      const objects = active();
       if (objects.length === 0) return;
       e.preventDefault();
       const i = objects.findIndex(o => o.id === s.selection);
@@ -139,8 +145,10 @@ export function bindEditorInput(ctrl: EditController): () => void {
   overlay.addEventListener('pointercancel', onPointerCancel);
   overlay.addEventListener('dblclick', onDoubleClick);
   doc.addEventListener('keydown', onKeyDown);
+  ctrl.cancelDrag = () => { cancelDrag(); };
   return () => {
     drag = null;
+    ctrl.cancelDrag = null;
     overlay.removeEventListener('pointerdown', onPointerDown);
     overlay.removeEventListener('pointermove', onPointerMove);
     overlay.removeEventListener('pointerup', onPointerUp);

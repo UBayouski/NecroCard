@@ -78,6 +78,8 @@ Rules the schema does not check, which are required too:
 - openCard, closeCard, openStack and closeStack handlers belong in card, background or stack scripts; object scripts
   receive only mouseUp and mouseDown, so those handlers never run on a button or field. The reverse holds too: mouseUp
   and mouseDown handlers belong on buttons and fields, not on cards.
+- Sound is optional: a handler may use play "<notes>" for a short sting or jingle (keep melodies under 16 notes),
+  for example a fanfare on a right answer or a sting on openCard. Only add sound if it fits; it is never required.
 
 This is the shape of a valid stack:
 ${JSON.stringify(EXAMPLE_STACK)}

@@ -62,7 +62,7 @@
           "type": "button",
           "rect": { "x": 80, "y": 120, "w": 352, "h": 28 },
           "visible": true,
-          "script": "on mouseUp\n  go to card \"Q2\"\nend mouseUp",
+          "script": "on mouseUp\n  play \"c e g c5\"\n  go to card \"Q2\"\nend mouseUp",
           "style": "rect",
           "label": "A) A zombie",
           "autoHilite": true
@@ -73,7 +73,7 @@
           "type": "button",
           "rect": { "x": 80, "y": 160, "w": 352, "h": 28 },
           "visible": true,
-          "script": "on mouseUp\n  go to card \"Q2\"\nend mouseUp",
+          "script": "on mouseUp\n  play \"e c\"\n  go to card \"Q2\"\nend mouseUp",
           "style": "rect",
           "label": "B) A vampire",
           "autoHilite": true
@@ -84,7 +84,7 @@
           "type": "button",
           "rect": { "x": 80, "y": 200, "w": 352, "h": 28 },
           "visible": true,
-          "script": "on mouseUp\n  go to card \"Q2\"\nend mouseUp",
+          "script": "on mouseUp\n  play \"e c\"\n  go to card \"Q2\"\nend mouseUp",
           "style": "rect",
           "label": "C) A garden gnome",
           "autoHilite": true
@@ -114,7 +114,7 @@
           "type": "button",
           "rect": { "x": 80, "y": 120, "w": 352, "h": 28 },
           "visible": true,
-          "script": "on mouseUp\n  go to card \"Q3\"\nend mouseUp",
+          "script": "on mouseUp\n  play \"e c\"\n  go to card \"Q3\"\nend mouseUp",
           "style": "rect",
           "label": "A) July",
           "autoHilite": true
@@ -125,7 +125,7 @@
           "type": "button",
           "rect": { "x": 80, "y": 160, "w": 352, "h": 28 },
           "visible": true,
-          "script": "on mouseUp\n  go to card \"Q3\"\nend mouseUp",
+          "script": "on mouseUp\n  play \"c e g c5\"\n  go to card \"Q3\"\nend mouseUp",
           "style": "rect",
           "label": "B) October",
           "autoHilite": true
@@ -136,7 +136,7 @@
           "type": "button",
           "rect": { "x": 80, "y": 200, "w": 352, "h": 28 },
           "visible": true,
-          "script": "on mouseUp\n  go to card \"Q3\"\nend mouseUp",
+          "script": "on mouseUp\n  play \"e c\"\n  go to card \"Q3\"\nend mouseUp",
           "style": "rect",
           "label": "C) February",
           "autoHilite": true
@@ -166,7 +166,7 @@
           "type": "button",
           "rect": { "x": 80, "y": 120, "w": 352, "h": 28 },
           "visible": true,
-          "script": "on mouseUp\n  go to card \"Results\"\nend mouseUp",
+          "script": "on mouseUp\n  play \"e c\"\n  go to card \"Results\"\nend mouseUp",
           "style": "rect",
           "label": "A) A bowl of candy",
           "autoHilite": true
@@ -177,7 +177,7 @@
           "type": "button",
           "rect": { "x": 80, "y": 160, "w": 352, "h": 28 },
           "visible": true,
-          "script": "on mouseUp\n  go to card \"Results\"\nend mouseUp",
+          "script": "on mouseUp\n  play \"c e g c5\"\n  go to card \"Results\"\nend mouseUp",
           "style": "rect",
           "label": "B) A lit jack-o-lantern",
           "autoHilite": true
@@ -188,7 +188,7 @@
           "type": "button",
           "rect": { "x": 80, "y": 200, "w": 352, "h": 28 },
           "visible": true,
-          "script": "on mouseUp\n  go to card \"Results\"\nend mouseUp",
+          "script": "on mouseUp\n  play \"e c\"\n  go to card \"Results\"\nend mouseUp",
           "style": "rect",
           "label": "C) Your accountant",
           "autoHilite": true

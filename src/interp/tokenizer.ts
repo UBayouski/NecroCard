@@ -30,6 +30,7 @@ export const KEYWORDS = new Set([
   'go', 'to', 'card', 'next', 'prev', 'first', 'last',
   'put', 'into', 'before', 'after', 'get', 'set', 'of',
   'global', 'answer', 'with', 'or', 'ask', 'show', 'hide', 'beep',
+  'play', 'tempo', 'stop',
   'visual', 'effect', 'dissolve', 'wipe', 'left', 'right', 'scroll', 'up',
   'and', 'not', 'is', 'contains',
   'the', 'times', 'while', 'mod',

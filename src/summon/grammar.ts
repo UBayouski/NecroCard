@@ -94,6 +94,15 @@ export const GRAMMAR_EXAMPLES: readonly GrammarExample[] = [
     ].join('\n'),
   },
   {
+    title: 'play a short sting (optional; keep melodies short)',
+    script: [
+      'on mouseUp',
+      '  play "c e g c5"',
+      '  go next',
+      'end mouseUp',
+    ].join('\n'),
+  },
+  {
     title: 'ask, chunks and functions',
     script: [
       'on mouseUp',
@@ -114,6 +123,7 @@ export const RESERVED_WORDS: readonly string[] = [
   'go', 'to', 'card', 'next', 'prev', 'first', 'last',
   'put', 'into', 'before', 'after', 'get', 'set', 'of',
   'global', 'answer', 'with', 'or', 'ask', 'show', 'hide', 'beep',
+  'play', 'tempo', 'stop',
   'visual', 'effect', 'dissolve', 'wipe', 'left', 'right', 'scroll', 'up',
   'and', 'not', 'is', 'contains',
   'the', 'times', 'while', 'mod',
@@ -151,6 +161,10 @@ Commands:
   ask <expr> [with <default>]   (the typed text is in it)
   show <object> | hide <object>
   beep
+  play "<notes>" | play tempo <bpm> "<notes>" | play stop
+    notes: whitespace-separated, e.g. "c e g c5". Each note is a letter a-g, optional # or b, optional octave 0-8
+    (default 4, and it sticks for later notes), optional duration w h q e s = whole half quarter eighth sixteenth
+    (default q, and it sticks); r is a rest. a4 is 440 Hz. play does not block; play stop silences.
   if <expr> then <one statement>
   if <expr> then / [else if <expr> then] / [else] / end if   (multi-line form)
   repeat <n> times / repeat with <var> = <a> to <b> / repeat while <expr>   ... end repeat
@@ -168,7 +182,7 @@ Expressions: numbers, "strings" (double quotes only, no escapes), true, false, v
 
 Reserved words cannot be variable or handler names: ${RESERVED_WORDS.join(' ')}.
 
-Not supported (never use): do, sort, send, find, play, item, the target, chunk ranges (word 2 to 4), putting into
+Not supported (never use): do, sort, send, find, item, the target, chunk ranges (word 2 to 4), putting into
 a chunk, number formatting, menus, paint commands, external commands, quotes inside strings.
 
 Examples:

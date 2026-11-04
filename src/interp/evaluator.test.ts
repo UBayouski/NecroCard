@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as fc from 'fast-check';
 import { evaluate, ExitRepeatException, NextRepeatException, PassException } from './evaluator.js';
 import type { HostInterface, ResolvedObjectRef, EvaluateOptions } from './evaluator.js';
+import type { Note } from './notes.js';
 import { parse } from './parser.js';
 import { NecroTalkError } from './errors.js';
 import { KEYWORDS } from './tokenizer.js';
@@ -22,6 +23,9 @@ class MockHost implements HostInterface {
   refCalls: { method: string; ref: ResolvedObjectRef }[] = [];
   goToCardCalls: number[] = [];
   beepCount = 0;
+  /** Recorded play(notes, tempo) calls (necrotalk-play). */
+  playCalls: { notes: Note[]; tempo: number }[] = [];
+  stopSoundCount = 0;
   answerResponse = 'OK';
   askResponse = '';
   visualEffects: string[] = [];
@@ -63,6 +67,8 @@ class MockHost implements HostInterface {
   getFieldText(ref: ResolvedObjectRef) { return this.fields.get(ref.name) ?? ''; }
   setFieldText(ref: ResolvedObjectRef, text: string) { this.fields.set(ref.name, text); }
   beep() { this.beepCount++; }
+  play(notes: Note[], tempo: number) { this.playCalls.push({ notes, tempo }); }
+  stopSound() { this.stopSoundCount++; }
   getDate() { return '2026-11-03'; }
   getTime() { return '14:00:00'; }
   random(n: number) { return Math.floor(Math.random() * n) + 1; }
@@ -88,6 +94,51 @@ describe('evaluator — skeleton', () => {
   it('evaluates a handler with beep', async () => {
     const { host } = await run('on h\n  beep\nend h');
     expect(host.beepCount).toBe(1);
+  });
+
+  it('play "c e g" calls play once with three notes at tempo 120', async () => {
+    const { host } = await run('on h\n  play "c e g"\nend h');
+    expect(host.playCalls).toHaveLength(1);
+    expect(host.playCalls[0].tempo).toBe(120);
+    expect(host.playCalls[0].notes).toHaveLength(3);
+    expect(host.playCalls[0].notes.every(n => n.frequency !== null)).toBe(true);
+  });
+
+  it('play tempo 160 "c" passes the resolved tempo', async () => {
+    const { host } = await run('on h\n  play tempo 160 "c"\nend h');
+    expect(host.playCalls[0].tempo).toBe(160);
+  });
+
+  it('a second play in the same handler calls play again (replace is the host\'s job)', async () => {
+    const { host } = await run('on h\n  play "c"\n  play "e"\nend h');
+    expect(host.playCalls).toHaveLength(2);
+  });
+
+  it('play from a variable resolves the notes string', async () => {
+    const { host } = await run('on h\n  put "c e g" into t\n  play t\nend h');
+    expect(host.playCalls[0].notes).toHaveLength(3);
+  });
+
+  it('play stop calls stopSound and schedules no notes', async () => {
+    const { host } = await run('on h\n  play stop\nend h');
+    expect(host.stopSoundCount).toBe(1);
+    expect(host.playCalls).toHaveLength(0);
+  });
+
+  it('a bad note token is a runtime error at the play line, naming the token, and plays nothing', async () => {
+    const host = new MockHost();
+    await expect(run('on h\n  beep\n  play "c e h9"\nend h', 'h', host)).rejects.toThrow(NecroTalkError);
+    const err = await run('on h\n  play "c e h9"\nend h').catch(e => e) as NecroTalkError;
+    expect(err).toBeInstanceOf(NecroTalkError);
+    expect(err.message).toBe('Line 2: "h9" is not a note.');
+    expect(err.line).toBe(2);
+    expect(host.playCalls).toHaveLength(0);
+  });
+
+  it('a non-positive tempo is a runtime error at the play line', async () => {
+    const err = await run('on h\n  play tempo 0 "c"\nend h').catch(e => e) as NecroTalkError;
+    expect(err).toBeInstanceOf(NecroTalkError);
+    expect(err.line).toBe(2);
   });
 
   it('returns silently when handler not found', async () => {
@@ -522,8 +573,8 @@ describe('regression — misplaced exit / next / pass raise NecroTalkError', () 
 describe('regression — internal-error messages expose no AST names', () => {
   it('unsupported statement', async () => {
     const script = parse('on h\n  beep\nend h');
-    // Simulate an AST node the evaluator does not support (e.g. a future Phase 2 node)
-    (script.handlers[0].body as unknown[]).push({ kind: 'play', line: 3 });
+    // Simulate an AST node the evaluator does not support (a still-unimplemented Phase 2 node)
+    (script.handlers[0].body as unknown[]).push({ kind: 'find', line: 3 });
     await expect(evaluate(script, 'h', [], new MockHost(), new Map()))
       .rejects.toThrow('Line 3: Internal error, unsupported statement.');
   });

@@ -98,7 +98,8 @@ describe('runMessageBoxLine directly', () => {
     goToCard: async () => {}, getCurrentCardIndex: () => 0, getCardCount: () => 1, getCardNames: () => ['A'],
     setVisualEffect: async () => {}, answer: async () => 'OK', ask: async () => '',
     showObject: () => {}, hideObject: () => {}, getProperty: () => '', setProperty: () => {},
-    getFieldText: () => '', setFieldText: () => {}, beep: vi.fn(), getDate: () => '', getTime: () => '',
+    getFieldText: () => '', setFieldText: () => {}, beep: vi.fn(), play: vi.fn(), stopSound: vi.fn(),
+    getDate: () => '', getTime: () => '',
     random: () => 1,
   };
 

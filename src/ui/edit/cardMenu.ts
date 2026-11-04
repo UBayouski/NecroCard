@@ -4,11 +4,14 @@ export interface CardMenuActions {
   next(): void;
   prev(): void;
   cardInfo(): void;
+  editBackground(): void;
 }
 
 export interface CardMenu {
   el: HTMLElement;
   setCanDelete(can: boolean): void;
+  /** Reflect the edit-background layer state on the checkable menu item (edit-background REQ-3.2). */
+  setEditBackground(on: boolean): void;
   open(): void;
   close(): void;
 }
@@ -67,6 +70,28 @@ export function createCardMenu(actions: CardMenuActions): CardMenu {
   add('Prev', actions.prev);
   add('Card Info…', actions.cardInfo);
 
+  // Edit Background: a checkable item with a CSS-drawn check and a keyboard-shortcut hint.
+  const bgLi = document.createElement('li');
+  bgLi.setAttribute('role', 'none');
+  const bgItem = document.createElement('button');
+  bgItem.type = 'button';
+  bgItem.className = 'card-menu-item card-menu-check';
+  bgItem.setAttribute('role', 'menuitemcheckbox');
+  bgItem.setAttribute('aria-checked', 'false');
+  bgItem.tabIndex = -1;
+  bgItem.textContent = 'Edit Background';
+  const hint = document.createElement('span');
+  hint.className = 'card-menu-hint';
+  hint.textContent = 'Ctrl+B';
+  bgItem.append(hint);
+  bgItem.addEventListener('click', () => {
+    close(true);
+    actions.editBackground();
+  });
+  bgLi.append(bgItem);
+  list.append(bgLi);
+  items.push(bgItem);
+
   const focusItem = (i: number) => items[(i + items.length) % items.length].focus();
   const open = () => {
     list.hidden = false;
@@ -100,6 +125,7 @@ export function createCardMenu(actions: CardMenuActions): CardMenu {
   return {
     el,
     setCanDelete: can => del.setAttribute('aria-disabled', String(!can)),
+    setEditBackground: on => bgItem.setAttribute('aria-checked', String(on)),
     open,
     close: () => close(false),
   };

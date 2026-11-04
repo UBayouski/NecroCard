@@ -755,3 +755,105 @@ name follows stack.name and the inspector is the rename. The design also had to 
 localStorage in a wrapper that swallows errors, so a quota failure would never have reached the library.
 Verification after the run: 1017 unit tests in 70 files, protected directories untouched, both screenshots
 checked. Two files sit just over the 300-line guideline; left as Kiro flagged them.
+
+
+## 2026-11-04 - Spec 10: edit-background (requirements, design, tasks, implementation)
+Surface: CLI (Auto)
+Features: spec, steering, MCP (Playwright)
+What I asked for: an "Edit Background" toggle in the Card menu (Ctrl+B) that swaps which layer the editor acts on,
+as HyperCard's Edit Background did, so the shared Next/Prev controls a summoned stack puts on the background become
+editable; an edit to a background object shows on every card that shares it. Session state only, off after any load
+and on leaving Edit, kept across cards; a chrome-only indicator (a diagonal stripe on the window title bar plus the
+menu check); layer-aware commands and undo; Browse and the interpreter untouched. Changes confined to src/ui/edit/
+plus a title-bar class on the stage; no change to src/interp, src/model, fixtures, src/summon, server/, src/share,
+or deps. Written requirements-first with two review rounds before code.
+What Kiro did: gave the editor session a layer ('card' | 'background') with setLayer/toggleLayer and a container()
+helper, so selection, hit testing, Tab, the add tools, Delete, the inspector and undo all act on the active layer.
+The object-targeting commands swapped their cardId for a CommandTarget ({card} | {background}), and the object
+ScriptOwner the same, so applyCommand resolves and undo restores on the right layer; describeCommand suffixes
+"(background)". The overlay renders the active layer's objects; the Card menu gained a menuitemcheckbox with a
+CSS-drawn check and a plain-text "Ctrl+B" hint; the stage toggles a card-window-title--editing-bg class that draws a
+45-degree repeating-linear-gradient stripe (chrome only). focusOn was rewritten so undo/redo never switches the
+layer: it shows a card holding the object and selects it only when it is on the active layer. A fast-check property
+now applies each random edit on a randomly chosen layer and still undoes/redoes byte-for-byte across all three
+fixtures.
+Review and what I decided: two things I handled on my own. First, I corrupted two existing test files by editing
+them with PowerShell Set-Content -Encoding utf8, which added a BOM and mangled the em-dashes and ellipses; I caught
+it when an unrelated image-truncation assertion failed, restored both files from git, and reapplied the edits with
+the str-replace tool (which preserves encoding) — and avoided Set-Content for source files after that. Second, the
+e2e first tried to select the shared button by clicking its DOM element, but in Edit mode the card layer is inert
+under the overlay, so I switched to Tab-based selection and data-selected-id, which is how the editor really selects;
+I also corrected the undo count once I remembered consecutive nudges coalesce into one history entry. Results:
+typecheck, lint, test, build, server:build and e2e all green; 1022 unit tests in 70 files; 28 e2e tests. The MCP run
+showed the diagonal-striped title bar with the new background button selected (its dashed outline and handles) and
+the card's own Begin button drawn but unselected; its only console error was the expected /api/health 502, and it
+cleared localStorage at the end. Screenshot in docs/screenshots/edit-background.png. One file is over the ~300-line
+guideline: src/ui/edit/session.ts at 342 (it was 254 before this spec). The clean extraction — moving focusOn out —
+is entangled with the session's in-place cardIndex/selection mutation and the layer-aware activeObjects, so I flagged
+it for review rather than force a split I was not sure preserved behaviour.
+
+## 2026-11-04 — Spec 10 closed: review notes
+Surface: CLI (Auto)
+Features: spec
+Two review findings before any code. The requirements used the flashcards sample as the worked example of a shared
+background, but none of the three bundled samples has a background object: their Next and Prev are card objects,
+and only summoned stacks put controls on the background. Fixtures are protected, so the e2e and the MCP run now
+create the background button themselves and watch it appear on the next card. And the proposed rule that undo
+would switch Edit Background on to show a restored background object was reversed: undo never changes the layer,
+it selects the object only when it is on the active layer, and the change is visible anyway because the inactive
+layer is drawn. HyperCard's own conventions supplied the rest: Ctrl+B for the toggle and a hatched title bar as the
+indicator. Verification after the run: 1022 unit tests in 70 files, protected directories untouched, the
+screenshot checked. session.ts sits at 342 lines; the focusOn extraction Kiro offered is deferred, the undo
+property test being the safety net if it is done later.
+
+
+## 2026-11-04 - Spec 11: necrotalk-play (requirements, design, tasks, implementation)
+Surface: CLI (Auto)
+Features: spec, steering, MCP (Playwright)
+What I asked for: one synthesized voice for NecroTalk - `play "<notes>"` and `play stop`, with an optional
+`tempo <n>` prefix - so sample and summoned stacks can play short stings and jingles (a 1-bit square-wave tone,
+not recorded sound). Scope is play only; item, find and send stay unimplemented. A pure notes parser in src/interp,
+the host interface gains play/stopSound, domHost schedules the oscillators, the script editor and Summon learn
+play, and the three samples get sound in their existing handlers. No change to src/model, server, src/share,
+src/ui/edit or deps. Written requirements-first with two review rounds before code.
+What Kiro did: a pure src/interp/notes.ts (parseNotes/formatNotes, NoteParseError) with sticky octave/duration,
+a4=440 equal temperament, and both fast-check properties (format->parse round-trip, and every frequency a
+power-of-two-twelfth of 440). Tokenizer gained play/tempo/stop; the AST, parser and printer gained a PlayStatement
+(play stop / play [tempo <expr>] <expr>); the evaluator resolves the operands, parses the notes before any host
+call so a bad token is a line error that plays nothing, and calls host.play/stopSound through the existing
+hostCall wrapper. domHost schedules one square-wave voice per note at the beep's 0.1 gain with a 10 ms gap floored
+at half the note, replaces on a new play, and silences through the gain (not a second osc.stop) with an onended
+cleanup. The shared AudioContext is now created only inside the one-time pointerdown/keydown listener, which also
+removed the Chrome "AudioContext was not allowed to start" warning; beep shares that gate. main.ts stops sound on
+load and on entering Edit via a runtime stopSound pass-through. Summon moved play to supported with a one-line notes
+grammar, an example and one prompt sentence; item/find/send stay unsupported.
+Fixture play lines added (existing handlers only; the Manor got two minimal openCard handlers, no object change):
+- quiz Q1 AnswerA (right): play "c e g c5"; AnswerB, AnswerC (wrong): play "e c"
+- quiz Q2 AnswerB (right): play "c e g c5"; AnswerA, AnswerC (wrong): play "e c"
+- quiz Q3 AnswerB (right): play "c e g c5"; AnswerA, AnswerC (wrong): play "e c"
+- The Cursed Manor Entrance openCard: play "c e g e c"; Cellar openCard: play "a2 g2 e2 c2"
+- Spooky Flashcards Flip (every card): play "c5s" before show field "Answer"
+Review and what I decided on my own: a prior regression test used `kind: 'play'` as its stand-in for an
+unimplemented node; since play is now real I repointed it to `find`. The tokenizer change forced grammar.ts's
+RESERVED_WORDS to stay in sync (a test enforces equality with the tokenizer keywords), so I added the three words
+there during Task 2 even though grammar.ts is nominally Task 6. The quiz has no scoring, so "right vs wrong" is just
+which button advances; I put the fanfare on the known-correct answer (A zombie / October / lit jack-o-lantern, per
+the existing browse e2e) and the falling pair on the others. One edit-background e2e flaked under parallel load at
+its "enter Edit" step (passed 5/5 in isolation); it is a pre-existing timing race, which I hardened with a
+retry-the-click `toPass` rather than leave the suite intermittently red. Results: typecheck, lint, test,
+build, server:build and e2e all green; 1068 unit tests in 72 files; 29 e2e tests. The MCP run played the quiz to a
+right answer and recorded four oscillators at 261.6/329.6/392.0/523.3 Hz (c e g c5); the only console message was
+the expected /api/health 502 and - the point of the deferred context - no AudioContext warning; it cleared
+localStorage at the end. File note: src/interp/parser.ts (1122) and evaluator.ts (658) are over the ~300 guideline
+but were so long before this spec; this spec's own new file, notes.ts, is 116.
+
+## 2026-11-04 — Spec 11 closed: review notes
+Surface: CLI (Auto) / Features: spec
+Two review rounds changed the design before any code. The first stopSound called osc.stop() on a voice that already
+had a scheduled stop, which throws and skipped the disconnect, so a stopped melody could still finish; stop now
+silences through the gain first. The shared AudioContext used to be created at module load, which Chrome warns
+about before a gesture; it is now created in the one-time gesture listener, and beep shares that gate (no audible
+change, since a beep always follows a click or key). Note syntax: a bare `b` is the note B and `bb` is B-flat, chosen
+over treating a leading b as a flat. Verification after the run: 1068 unit tests in 72 files, 29 e2e; the fixture
+diffs are exactly the play lines listed above and nothing else; no BOMs; src/model, src/share, server and
+src/ui/edit untouched. parser.ts and evaluator.ts were already over the size guideline before this spec.

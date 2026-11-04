@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parse } from './parser.js';
+import { parseNotes } from './notes.js';
 import quiz from '../../fixtures/quiz.necrocard.json';
 import adventure from '../../fixtures/adventure.necrocard.json';
 import flashcards from '../../fixtures/flashcards.necrocard.json';
@@ -31,5 +32,17 @@ describe('fixture scripts parse under NecroTalk', () => {
         expect(() => parse(src)).not.toThrow();
       }
     });
+
+    it(`every play notes string in ${name}.necrocard.json parses (necrotalk-play REQ-7.4)`, () => {
+      const notes = collectScripts(stack)
+        .flatMap(src => [...src.matchAll(/play (?:tempo \d+ )?"([^"]*)"/g)].map(m => m[1]));
+      for (const n of notes) expect(() => parseNotes(n)).not.toThrow();
+    });
   }
+
+  it('the quiz has a play line (sound was added)', () => {
+    const notes = collectScripts(quiz as FixtureStack)
+      .flatMap(src => [...src.matchAll(/play (?:tempo \d+ )?"([^"]*)"/g)].map(m => m[1]));
+    expect(notes.length).toBeGreaterThan(0);
+  });
 });

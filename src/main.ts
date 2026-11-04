@@ -148,7 +148,7 @@ function boot(root: HTMLElement): void {
   };
 
   const toggle = createModeToggle(mode => {
-    if (mode === 'edit') editor.enter();
+    if (mode === 'edit') { runtime.stopSound(); editor.enter(); }
     else editor.exit();
   });
 
@@ -201,6 +201,7 @@ function boot(root: HTMLElement): void {
   async function loadStack(stack: Stack): Promise<boolean> {
     if (runtime.isBusy) return false;
     loadSeq++;
+    runtime.stopSound();        // a melody never crosses a stack change (necrotalk-play REQ-3.3)
     persist.flush();
     editor.reset();
     stage.setTitle(stack.name);

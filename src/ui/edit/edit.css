@@ -256,6 +256,37 @@ textarea.inspector-input:read-only {
   font-size: 0;
 }
 
+/* The "Edit Background" checkable item: a CSS-drawn check (the glyph is outside the bundled fonts) in a reserved
+   gutter, and a right-aligned keyboard-shortcut hint. */
+.card-menu-check {
+  position: relative;
+  padding-left: 22px;
+}
+
+.card-menu-check[aria-checked="true"]::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  width: 4px;
+  height: 8px;
+  margin-top: -5px;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.card-menu-hint {
+  float: right;
+  margin-left: 16px;
+  color: var(--chrome-muted);
+}
+
+.card-menu-item:hover .card-menu-hint,
+.card-menu-item:focus-visible .card-menu-hint {
+  color: var(--chrome-surface);
+}
+
 .mode-toggle {
   display: inline-flex;
 }

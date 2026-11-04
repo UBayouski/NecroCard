@@ -1,4 +1,4 @@
-import type { Card, CardObject, Rect } from '../../model/types.js';
+import type { CardObject, Rect } from '../../model/types.js';
 import { applyRect } from '../browse/objectEl.js';
 import { HANDLE_SIZE, HANDLES, handlePoints } from './geometry.js';
 
@@ -62,9 +62,9 @@ export class EditOverlay {
     this.el.append(this.hiddenLayer, this.selection);
   }
 
-  /** Redraw for the current card and selection. */
-  render(card: Card, selected: CardObject | null): void {
-    this.hiddenLayer.replaceChildren(...card.objects.filter(o => !o.visible).map(o => {
+  /** Redraw for the given active-layer objects and selection. */
+  render(objects: CardObject[], selected: CardObject | null): void {
+    this.hiddenLayer.replaceChildren(...objects.filter(o => !o.visible).map(o => {
       const outline = document.createElement('div');
       outline.className = 'edit-hidden-outline';
       outline.dataset.objectId = o.id;

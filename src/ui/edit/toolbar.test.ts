@@ -44,6 +44,7 @@ describe('edit toolbar and card menu', () => {
     const actions = {
       addButton: vi.fn(), addField: vi.fn(), addImage: vi.fn(), undo: vi.fn(), redo: vi.fn(),
       newCard: vi.fn(), deleteCard: vi.fn(), next: vi.fn(), prev: vi.fn(), cardInfo: vi.fn(),
+      editBackground: vi.fn(),
     };
     const tb = createEditToolbar(actions);
     document.body.append(tb.el);
@@ -90,13 +91,16 @@ describe('edit toolbar and card menu', () => {
     expect(menuButton.getAttribute('aria-expanded')).toBe('true');
     const items = Array.from(tb.el.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
     expect(items.map(i => i.textContent)).toEqual(['New Card', 'Delete Card', 'Next', 'Prev', 'Card Info…']);
+    // The full focus ring also includes the checkable Edit Background item (last).
+    const ring = Array.from(tb.el.querySelectorAll<HTMLButtonElement>('[role="menuitem"], [role="menuitemcheckbox"]'));
+    expect(ring.at(-1)!.textContent).toContain('Edit Background');
     expect(document.activeElement).toBe(items[0]);
     key(items[0], 'ArrowDown');
     expect(document.activeElement).toBe(items[1]);
     key(items[1], 'ArrowUp');
     key(items[0], 'ArrowUp');
-    expect(document.activeElement).toBe(items[4]);
-    key(items[4], 'Escape');
+    expect(document.activeElement).toBe(ring.at(-1)); // wraps to the last item, Edit Background
+    key(ring.at(-1)!, 'Escape');
     expect(menuButton.getAttribute('aria-expanded')).toBe('false');
     expect(document.activeElement).toBe(menuButton);
   });

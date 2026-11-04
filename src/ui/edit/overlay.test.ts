@@ -17,7 +17,7 @@ describe('EditOverlay', () => {
   it('draws the selection as a dashed 1px SVG outline with 4px dashes and gaps', () => {
     const { card, shown } = sample();
     const o = new EditOverlay();
-    o.render(card, shown);
+    o.render(card.objects, shown);
     const rect = o.el.querySelector('svg rect')!;
     expect(rect.getAttribute('stroke-dasharray')).toBe('4 4');
     expect(rect.getAttribute('stroke-width')).toBe('1');
@@ -69,7 +69,7 @@ describe('EditOverlay', () => {
   it('places eight 4 × 4 handles centred on the corners and edge midpoints', () => {
     const { card, shown } = sample();
     const o = new EditOverlay();
-    o.render(card, shown);
+    o.render(card.objects, shown);
     const handles = Array.from(o.el.querySelectorAll<HTMLElement>('.edit-handle'));
     expect(handles.map(h => h.dataset.handle)).toEqual([...HANDLES]);
     const points = handlePoints(shown.rect);
@@ -83,7 +83,7 @@ describe('EditOverlay', () => {
   it('outlines exactly the hidden card objects, and hides the selection when nothing is selected', () => {
     const { card, ghost } = sample();
     const o = new EditOverlay();
-    o.render(card, null);
+    o.render(card.objects, null);
     const outlines = Array.from(o.el.querySelectorAll<HTMLElement>('.edit-hidden-outline'));
     expect(outlines.map(e => e.dataset.objectId)).toEqual([ghost.id]);
     expect(outlines[0].style.width).toBe('40px');
@@ -93,7 +93,7 @@ describe('EditOverlay', () => {
   it('showSelection previews a rect without a model change', () => {
     const { card, shown } = sample();
     const o = new EditOverlay();
-    o.render(card, shown);
+    o.render(card.objects, shown);
     o.showSelection({ x: 50, y: 60, w: 20, h: 20 });
     expect(o.el.querySelector<HTMLElement>('svg')!.style.left).toBe('48px'); // 50, inflated by 2
     expect(shown.rect.x).toBe(10);

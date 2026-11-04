@@ -127,6 +127,11 @@ export class CardStage {
     if (!on) this.setSelected(null);
   }
 
+  /** Mark the window title bar with the diagonal stripe while editing the background (edit-background REQ-3.1). */
+  setEditingBackground(on: boolean): void {
+    this.titleBar.classList.toggle('card-window-title--editing-bg', on);
+  }
+
   get isEditing(): boolean {
     return this.editing;
   }

@@ -21,6 +21,13 @@ describe('highlightLine — one example per span kind', () => {
     expect(kinds(highlightLine('Go Next'))).toEqual([['keyword', 'Go'], ['keyword', 'Next']]);
   });
 
+  it('play, tempo and stop highlight as keywords', () => {
+    expect(kinds(highlightLine('play tempo 160 "c e g"'))).toEqual([
+      ['keyword', 'play'], ['keyword', 'tempo'], ['number', '160'], ['string', '"c e g"'],
+    ]);
+    expect(kinds(highlightLine('play stop'))).toEqual([['keyword', 'play'], ['keyword', 'stop']]);
+  });
+
   it('strings include both quotes; numbers; operators; punctuation', () => {
     expect(kinds(highlightLine('put "a b" & 3.5 into field ("Q" && n)'))).toEqual([
       ['keyword', 'put'], ['string', '"a b"'], ['operator', '&'], ['number', '3.5'], ['keyword', 'into'],

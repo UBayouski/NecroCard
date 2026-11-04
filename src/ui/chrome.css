@@ -214,6 +214,14 @@ body {
   display: none;
 }
 
+/* While editing the background (edit-background REQ-3.1), the title-bar stripes go diagonal — the one
+   unmistakable chrome indicator. Chrome only; the card surface is untouched. The label keeps its solid
+   background, so the stack name stays readable over the stripe. */
+.card-window-title--editing-bg::before,
+.card-window-title--editing-bg::after {
+  background: repeating-linear-gradient(45deg, #000000 0, #000000 1px, #ffffff 1px, #ffffff 3px);
+}
+
 /* The window outlines the card, so the card frame has no border of its own. */
 .card-frame {
   flex: 0 0 auto;
