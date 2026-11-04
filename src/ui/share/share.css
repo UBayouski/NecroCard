@@ -1,0 +1,21 @@
+/* Share dialog: a few rules on top of the summon dialog styles (.summon-dialog, .summon-* reused). */
+
+.share-url {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #6b6b6b;
+  background: #ffffff;
+  color: #000000;
+  font-family: var(--font-script);
+  font-size: 12px;
+}
+
+.share-url:focus-visible {
+  outline: 1px dotted #000000;
+  outline-offset: 1px;
+}
+
+.share-length {
+  color: var(--chrome-muted);
+}

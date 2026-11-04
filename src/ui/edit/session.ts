@@ -43,6 +43,8 @@ export class EditSession {
 
   get stack(): Stack { return this.state.stack; }
   get cardIndex(): number { return this.state.cardIndex; }
+  /** Monotonic counter of applied/undone/redone commands; unchanged by pure navigation. */
+  get revision(): number { return this.history.revision; }
   /** True when this session edits the given runtime state (one session per loaded stack). */
   isFor(state: BrowseState): boolean { return this.state === state; }
   private get card() { return this.state.stack.cards[this.state.cardIndex]; }

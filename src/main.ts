@@ -5,6 +5,7 @@ import './ui/browse/browse.css';
 import './ui/edit/edit.css';
 import './ui/script-editor/script-editor.css';
 import './ui/summon/summon.css';
+import './ui/share/share.css';
 import { loadFixture, type FixtureName } from './model/fixtures.js';
 import type { Stack } from './model/types.js';
 import { CardStage } from './ui/browse/stage.js';
@@ -18,22 +19,27 @@ import { createNewStack } from './ui/edit/newStack.js';
 import { MessageBoxInput } from './ui/script-editor/messageBoxInput.js';
 import { SettingsDialog } from './ui/summon/settingsDialog.js';
 import { SummonDialog } from './ui/summon/summonDialog.js';
+import { ShareDialog } from './ui/share/shareDialog.js';
 import { createAgentClient } from './summon/agentClient.js';
 import { createDirectTransport, KEY_STORAGE, testDirectKey } from './summon/directTransport.js';
 import { createServerTransport } from './summon/serverTransport.js';
 import type { Transport } from './summon/transport.js';
 import { createWakeState } from './summon/wake.js';
+import { chooseInitialLoad, createAutosave, DEFAULT_FIXTURE, type StorageLike } from './share/autosave.js';
+import { decodeStack } from './share/codec.js';
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+/** localStorage wrapped so a disabled or full store never throws (privacy mode, quota). */
+const safeStorage: StorageLike & { getItem(k: string): string | null } = {
+  getItem: k => { try { return localStorage.getItem(k); } catch { return null; } },
+  setItem: (k, v) => { try { localStorage.setItem(k, v); } catch { /* unavailable */ } },
+};
+
 /** The key is read from local storage only, at call time (summon REQ-4.3). */
 function readStoredKey(): string | null {
-  try {
-    const key = localStorage.getItem(KEY_STORAGE);
-    return key && key.trim() !== '' ? key : null;
-  } catch {
-    return null; // storage disabled: the server path still works
-  }
+  const key = safeStorage.getItem(KEY_STORAGE);
+  return key && key.trim() !== '' ? key : null;
 }
 
 const keyStorage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> = {
@@ -53,6 +59,12 @@ function boot(root: HTMLElement): void {
   const wake = createWakeState(apiBase);
   // Wake a sleeping Render service once; never blocks rendering, failures are silent.
   if (!readStoredKey()) wake.start();
+
+  const autosave = createAutosave(safeStorage);
+  // Persist the open stack before the page is hidden, in case an edit is still inside the debounce.
+  const flushAutosave = () => autosave.flush();
+  addEventListener('pagehide', flushAutosave);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushAutosave(); });
 
   const toolbar = document.createElement('header');
   toolbar.className = 'chrome-toolbar';
@@ -100,6 +112,11 @@ function boot(root: HTMLElement): void {
   settingsButton.className = 'chrome-button';
   settingsButton.textContent = 'Settings';
 
+  const shareButton = document.createElement('button');
+  shareButton.type = 'button';
+  shareButton.className = 'chrome-button';
+  shareButton.textContent = 'Share';
+
   /** Toolbar controls are disabled while scripts run or a summon is pending. */
   let summoning = false;
   const updateToolbar = () => {
@@ -107,6 +124,7 @@ function boot(root: HTMLElement): void {
     picker.setDisabled(busy);
     newStackButton.disabled = busy;
     summonButton.disabled = busy;
+    shareButton.disabled = busy;
     toggle.setDisabled(busy);
     messageBox.disabled = busy || editor.mode === 'edit';
   };
@@ -129,17 +147,21 @@ function boot(root: HTMLElement): void {
     toolbarHost: editToolbarHost,
     onModeChange: mode => toggle.set(mode),
     agent: createAgentClient(transportFor),
+    // Autosave person-made edits (sharing REQ-2.1). Debounced; button scripts do not call this.
+    onChange: () => { const s = runtime.currentStack; if (s) autosave.save(s); },
   });
 
   /** Bumped by every load, so a slow fixture import cannot replace a newer New Stack or Summon. */
   let loadSeq = 0;
 
-  /** Load any stack exactly like a fixture: Browse mode, history cleared (REQ-1.4). */
-  async function loadStack(stack: Stack): Promise<boolean> {
+  /** Load any stack exactly like a fixture: Browse mode, history cleared (REQ-1.4). Autosaves by default. */
+  async function loadStack(stack: Stack, opts: { autosave?: boolean } = {}): Promise<boolean> {
     if (runtime.isBusy) return false;
     loadSeq++;
     editor.reset();
-    return runtime.load(stack);
+    const ok = await runtime.load(stack);
+    if (ok && opts.autosave !== false) autosave.saveNow(stack);
+    return ok;
   }
 
   async function loadKey(key: FixtureName): Promise<void> {
@@ -184,8 +206,8 @@ function boot(root: HTMLElement): void {
     })();
   });
 
-  /** A summoned stack loads like New Stack, then opens in Edit mode under its own name (summon REQ-8.3). */
-  async function loadSummoned(stack: Stack): Promise<void> {
+  /** A summoned, imported or shared stack loads like New Stack, then opens in Edit mode under its own name. */
+  async function loadNamedInEdit(stack: Stack): Promise<void> {
     if (!(await loadStack(stack))) throw new Error('A script is still running. Try again when it finishes.');
     current = CUSTOM;
     picker.showCustom(stack.name);
@@ -198,7 +220,7 @@ function boot(root: HTMLElement): void {
   const summonDialog = new SummonDialog({
     transport: transportFor,
     wake,
-    onLoaded: loadSummoned,
+    onLoaded: loadNamedInEdit,
     onBusyChange: pending => {
       summoning = pending;
       updateToolbar();
@@ -208,10 +230,21 @@ function boot(root: HTMLElement): void {
     storage: keyStorage,
     testKey: (key, signal) => testDirectKey(key, signal),
   });
+  const shareDialog = new ShareDialog({
+    currentStack: () => {
+      const s = runtime.currentStack;
+      if (!s) throw new Error('No stack is loaded');
+      return s;
+    },
+    onImported: loadNamedInEdit,
+  });
   summonButton.addEventListener('click', () => {
     if (!runtime.isBusy) summonDialog.open();
   });
   settingsButton.addEventListener('click', () => settingsDialog.open());
+  shareButton.addEventListener('click', () => {
+    if (!runtime.isBusy && runtime.currentStack) shareDialog.open();
+  });
 
   messageBox.addEventListener('keydown', e => {
     if (e.key !== 'Enter' || runtime.isBusy || editor.mode === 'edit') return;
@@ -220,15 +253,66 @@ function boot(root: HTMLElement): void {
     messageBoxInput.submitted(line);
     // The input is disabled while busy, which drops focus; restore it with the text selected.
     void runtime.runMessageBox(line).then(() => {
+      // The message box is a person action, so persist any change it made (sharing REQ-2.1).
+      const s = runtime.currentStack;
+      if (s) autosave.save(s);
       messageBox.focus();
       messageBox.select();
     });
   });
 
-  toolbar.append(title, picker.el, newStackButton, summonButton, settingsButton, toggle.el);
+  /** Open a stack shared in the URL fragment: Browse, named, autosave OFF so the visitor's own save is kept. */
+  async function openShared(encoded: string): Promise<void> {
+    let stack: Stack;
+    try {
+      stack = await decodeStack(encoded);
+    } catch {
+      status.show('That shared link could not be opened; opening the sample stack.');
+      void loadKey(DEFAULT_FIXTURE);
+      return;
+    }
+    if (!(await loadStack(stack, { autosave: false }))) return;
+    current = CUSTOM;
+    picker.showCustom(stack.name);
+    // Drop the fragment (and any query) so a reload falls through to the visitor's own autosave.
+    history.replaceState(null, '', `${location.origin}${location.pathname}`);
+  }
+
+  toolbar.append(title, picker.el, newStackButton, summonButton, shareButton, settingsButton, toggle.el);
   root.replaceChildren(toolbar, editToolbarHost, workspace, statusEl, messageBoxInput.el);
   stage.observe();
-  void loadKey(fixtureFromSearch(location.search));
+
+  // Initial load (sharing REQ-2.2): share fragment, then ?stack=, then autosave, then the quiz.
+  const initial = chooseInitialLoad(location, safeStorage);
+  if (initial.corruptAutosave) status.show('Your saved stack could not be read; opening the sample stack.');
+  switch (initial.load.source) {
+    case 'share':
+      void openShared(initial.load.encoded);
+      break;
+    case 'fixture':
+      void loadKey(initial.load.key);
+      break;
+    case 'autosave': {
+      const saved = initial.load.stack;
+      void (async () => {
+        if (await loadStack(saved, { autosave: false })) {
+          current = CUSTOM;
+          picker.showCustom(saved.name);
+        }
+      })();
+      break;
+    }
+    case 'default':
+      void loadKey(DEFAULT_FIXTURE);
+      break;
+  }
+
+  // A share link pasted into an already-open tab only changes the fragment (a same-document
+  // navigation), so boot() does not re-run; handle it here. Opening in a fresh tab uses the load above.
+  addEventListener('hashchange', () => {
+    const encoded = new URLSearchParams(location.hash.replace(/^#/, '')).get('s');
+    if (encoded && encoded.trim() !== '' && !runtime.isBusy) void openShared(encoded);
+  });
 }
 
 const root = document.getElementById('app');

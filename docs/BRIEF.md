@@ -146,6 +146,7 @@ chunks as put targets, number formatting.
 - Autosave the open stack to localStorage.
 - Export and import `.necrocard.json`.
 - Share by URL: compressed stack in the fragment for small stacks; serverless blob store with a short id for larger ones.
+- Decided for the hackathon: sharing is by compressed URL fragment only, with no blob store; large stacks rely on a link-length warning and the Export fallback.
 
 ## 8. Visual design
 

@@ -31,6 +31,8 @@ export interface EditControllerDeps {
   validate?: (stack: Stack) => void;
   /** Explain / Fix agent for the script editors (script-editor REQ-5); defaults to the stub. */
   agent?: AgentClient;
+  /** Called after each successful committed mutation, for autosave (sharing REQ-5.1). */
+  onChange?: () => void;
 }
 
 const devValidate = (stack: Stack) => {
@@ -151,10 +153,13 @@ export class EditController {
     const s = this.session;
     if (!s || this.mode !== 'edit') return;
     if (flushFirst) this.flush();
+    const revBefore = s.revision;
     try {
       const ev = fn(s);
       this.deps.status.clear();
       this.refresh(ev ?? { render: false });
+      // Autosave only on a real content change; card navigation seals history but does not bump it.
+      if (s.revision !== revBefore) this.deps.onChange?.();
     } catch (e) {
       this.deps.status.show(messageOf(e));
       this.refresh({ render: true });

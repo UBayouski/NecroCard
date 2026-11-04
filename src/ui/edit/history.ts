@@ -13,8 +13,13 @@ export class History {
   private done: Entry[] = [];
   private undone: Command[] = [];
   private open = false;
+  /** Bumped on every content change (push, undo, redo). Lets callers detect a real mutation. */
+  private rev = 0;
 
   constructor(private readonly cap = HISTORY_CAP) {}
+
+  /** A monotonic counter that increases whenever a command is applied, undone or redone. */
+  get revision(): number { return this.rev; }
 
   /**
    * Record an applied command. A setRect with the same coalesceKey as the open top entry is
@@ -22,6 +27,7 @@ export class History {
    */
   push(cmd: Command, coalesceKey?: string): void {
     this.undone = [];
+    this.rev++;
     const top = this.done[this.done.length - 1];
     if (this.open && coalesceKey !== undefined && top?.coalesceKey === coalesceKey
       && top.cmd.kind === 'setRect' && cmd.kind === 'setRect' && top.cmd.objectId === cmd.objectId) {
@@ -43,6 +49,7 @@ export class History {
     this.open = false;
     const entry = this.done.pop();
     if (!entry) return null;
+    this.rev++;
     this.undone.push(entry.cmd);
     return { apply: invertCommand(entry.cmd), original: entry.cmd };
   }
@@ -52,6 +59,7 @@ export class History {
     this.open = false;
     const cmd = this.undone.pop();
     if (!cmd) return null;
+    this.rev++;
     this.done.push({ cmd });
     return cmd;
   }

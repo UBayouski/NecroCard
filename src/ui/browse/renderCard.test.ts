@@ -81,6 +81,17 @@ describe('renderCard', () => {
     );
   });
 
+  it('the round-rect button has no ::after bevel rule (single-colour border, no corner join)', async () => {
+    const css = (await readSource('./browse.css', import.meta.url)).replace(/\s+/g, ' ');
+    // No ::after selector targets .button-roundrect (the bevel pair caused a corner seam).
+    expect(css).not.toMatch(/\.button-roundrect[^,{}]*::after/);
+    // The rect button keeps its bevel.
+    expect(css).toMatch(/\.card-surface \.button-rect::after \{/);
+    // The round-rect border is one colour, thicker on the right and bottom for the shadow.
+    expect(css).toMatch(/\.card-surface \.button-roundrect \{[^}]*border-width: 1px 2px 2px 1px;/);
+    expect(css).not.toMatch(/\.card-surface \.button-roundrect \{[^}]*box-shadow/);
+  });
+
   it('images: data URL → <img>, asset id → placeholder with accessible name', () => {
     const { stack, pic, asset } = sample();
     const { elements } = renderCard(stack, 0, noHooks);

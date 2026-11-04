@@ -53,6 +53,7 @@ The whole stack serializes to one JSON document. **Round-trip must be lossless.*
 - Autosave the open stack to `localStorage`.
 - Export and import `.necrocard.json`.
 - Share by URL: compressed stack in the fragment for small stacks; serverless blob store with a short id for larger ones.
+- For the hackathon, sharing is by compressed URL fragment only (no blob store); a length warning and Export cover large stacks, and `src/share/` imports only `src/model/`.
 
 ## Non-goals (do not implement during the hackathon)
 

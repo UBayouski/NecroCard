@@ -32,7 +32,7 @@ function sampleStack(): Stack {
   });
 }
 
-function setup(opts: { pickFile?: () => Promise<File | null>; importDeps?: ImportDeps; agent?: AgentClient } = {}) {
+function setup(opts: { pickFile?: () => Promise<File | null>; importDeps?: ImportDeps; agent?: AgentClient; onChange?: () => void } = {}) {
   const stage = new CardStage();
   const inspectorHost = document.createElement('div');
   const toolbarHost = document.createElement('div');
@@ -74,6 +74,41 @@ async function settle(rt: BrowseRuntime) {
 }
 
 afterEach(() => { vi.restoreAllMocks(); document.body.replaceChildren(); });
+
+describe('EditController — onChange for autosave (sharing REQ-5.1)', () => {
+  it('fires once per content change, not on a no-op or card navigation', async () => {
+    const onChange = vi.fn();
+    const t = setup({ onChange });
+    await t.runtime.load(sampleStack());
+    t.ctrl().enter();
+    onChange.mockClear(); // ignore any entry churn
+
+    t.tool('Add button').click();           // a real mutation
+    expect(onChange).toHaveBeenCalledTimes(1);
+
+    const obj = t.runtime.currentState!.stack.cards[0].objects.at(-1)!;
+    t.ctrl().op(s => s.moveTo(obj.id, obj.rect, 'inspector'));
+    expect(onChange).toHaveBeenCalledTimes(1); // same rect → no-op → no extra call
+
+    t.ctrl().op(s => s.moveTo(obj.id, { x: 50, y: 50, w: 40, h: 20 }, 'inspector'));
+    expect(onChange).toHaveBeenCalledTimes(2); // a change fires it
+
+    t.ctrl().op(s => s.showCard(s.cardIndex + 1)); // card navigation: seals history, no content change
+    t.ctrl().op(s => s.showCard(s.cardIndex - 1));
+    expect(onChange).toHaveBeenCalledTimes(2); // still 2 — navigation does not autosave
+
+    t.ctrl().op(s => s.undo());                    // undo is a content change
+    expect(onChange).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not throw when onChange is not wired', async () => {
+    const t = setup();
+    await t.runtime.load(sampleStack());
+    t.ctrl().enter();
+    t.tool('Add button').click();
+    expect(t.runtime.currentState!.stack.cards[0].objects.length).toBeGreaterThan(2);
+  });
+});
 
 describe('EditController — entering and leaving edit mode', () => {
   it('enter: card layer inert, overlay, inspector and toolbar mounted, message box disabled', async () => {

@@ -524,3 +524,71 @@ do until asked, the prompt rule and a README line outside its task, are the rest
 three MCP screenshots are copied to docs/screenshots/. Open for later specs: the round rect bevel corner artifact
 and the selection outline (retro-skin), the "Status: scaffolding" README line (final pass), and the Render
 deployment itself (after sharing, when the blueprint is final).
+
+## 2026-11-03 — Spec 7: sharing (requirements, design, tasks)
+Surface: CLI (Auto)
+Features: spec, steering
+What I asked for: a `sharing` spec from BRIEF section 7 with one override decided first: no server blob store,
+because Render's free plan has no persistent storage (no disk, a non-persistent Key Value instance, a Postgres that
+expires inside the demo window), so a share link backed by the server would die when the service sleeps. Sharing is
+the whole stack deflated and base64url-encoded in the URL fragment, autosave to localStorage, and export/import of
+`.necrocard.json`; `src/share/` imports only `src/model/`.
+What Kiro did: REQ-1 to REQ-7 and seven tasks, with the override written into BRIEF §7 and product.md. It chose
+`deflate-raw` for the shortest output, a base64url guard before `atob` so a tampered link fails with a plain message
+instead of a DOMException, a four-way load order (share fragment, `?stack=`, autosave, default), and small hooks
+(`onChange` on the editor, `currentStack` on the runtime) so `src/main.ts` feeds the live working copy to the
+autosave. It raised ten open questions and flagged the one with a real trade-off itself: saving after every Browse
+dispatch would make a reload resume a quiz mid-play.
+Review: three changes. Autosave records what the person did, not what scripts did: Edit-mode commits, the message
+box, typing into an unlocked field, and loads, but not button-script dispatches, so a reload of the quiz starts it
+fresh. Opening someone else's share link must not overwrite the visitor's own autosaved stack, so a shared stack is
+not saved until the visitor edits it. And two implementation notes from reading the codec design: the stream
+writer's write and close promises need catch handlers or a bad link produces an unhandled rejection that Vitest
+counts as a failure, and the binary-string step before `btoa` must be chunked because spreading a large byte array
+into `String.fromCharCode` overflows the call stack on image-bearing stacks. The other defaults stand.
+
+## 2026-11-03 — Spec 7: sharing executed (tasks 1 to 6), with a same-document share-link bug found by e2e
+Surface: CLI (Auto)
+Features: spec, mcp
+What I asked for: the gate on autosave first (card navigation in Edit mode must not autosave), then Tasks 1 to 6,
+with the dev server up and the real API behind the proxy so the page load has a clean console.
+What Kiro did: the codec, autosave, export/import, the Share dialog, and the `src/main.ts` wiring; `EditController`
+gained an `onChange` driven by a history revision counter so only real content changes autosave, not next/prev. 909
+Vitest tests in 64 files and 14 e2e tests, with typecheck, lint, both builds and e2e all green and stable over three
+reruns. `src/interp`, `src/model`, `src/summon` and `server/` are untouched.
+The e2e found a real app bug the unit tests could not. Opening a share link on a tab that is already at the same
+path is a same-document navigation — only the fragment changes — so `boot()` never re-runs and the stack never
+loads or clears. Kiro first blamed the test, then reproduced both cases through the MCP browser (empty storage: the
+fragment cleared; a seeded autosave reached via a second same-path navigation: it did not), read the live
+`location.hash`, and saw the page had not reloaded. The fix is a `hashchange` listener in `main.ts` that opens a
+share fragment that appears on an already-open page; a fresh tab still uses the initial load. The share e2e opens
+the link through `about:blank` first so it is a full load, matching how a real person opens a link in a new tab.
+Two assertions were also wrong against real behaviour, which the MCP run exposed: a button's accessible name on the
+card is its label, not its object name (so the autosave test sets the label), and reading a Playwright download
+needs `download.path()` plus a dynamic `fs` import because the repo has no Node Buffer typings.
+MCP run: opened the quiz, Shared, saw a 1348-character link with the long-link warning hidden, Copy reported "Link
+copied.", opened the link in a second tab where it loaded in Browse on the Title card with the fragment already
+cleared and the picker showing "The Haunted Quiz", screenshot `.playwright-mcp/share-opened.png`, no console errors
+or warnings.
+What changed: the same-document case is worth remembering for any future fragment- or query-driven load — a SPA that
+only reads the URL in `boot()` silently ignores an in-tab link paste. The autosave gate uses the history revision,
+which is the one signal that already separates content edits from navigation.
+
+## 2026-11-03 — Spec 7 closed: review notes
+Surface: CLI (Auto)
+Features: spec, mcp, pbt
+What I asked for: after Kiro's own entry above, the autosave gate (card navigation in Edit mode must not count as
+a change), Task 6 with both servers up so the page load had a clean console, and Task 7.
+What Kiro did: a revision counter on the undo history that moves only when a command is applied, undone or redone,
+so the editor's change signal fires for content and not for navigation, with a test that counts calls through add,
+same-place move, real move, next, prev and undo. The e2e suite found a real bug: a share link opened in a tab
+already at the same path is a same-document navigation, so the boot code never re-ran. Kiro suspected its test
+first, reproduced both cases in the MCP browser, and fixed the app with a hashchange listener rather than bending the
+test. The same MCP run corrected two wrong assumptions in its tests (a button's accessible name is its label; a
+Playwright download is read from its path) and showed a 1348-character share link for the quiz opening in a second
+tab on the Title card with the fragment already cleared.
+What changed: My checks matched: 909 unit tests in 64 files, 14 e2e tests, both stable on rerun, protected
+directories untouched, no new dependency. The screenshot also confirms the round rect button fix made between the
+specs: a 1 px outline with a 2 px right and bottom shadow and clean corners, in place of the bevel whose white and
+black edges met in a visible seam. Kiro's note for later stands: any future URL-driven load must handle in-tab
+changes, not only the initial boot. Screenshot copied to docs/screenshots/share-opened.png.

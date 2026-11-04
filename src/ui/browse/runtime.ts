@@ -56,6 +56,8 @@ export class BrowseRuntime {
   get isBusy(): boolean { return this.state?.busy ?? false; }
   get currentState(): BrowseState | null { return this.state; }
   get currentHost(): DomHost | null { return this.host; }
+  /** The live working-copy stack, or null when nothing is loaded (sharing REQ-5.1). */
+  get currentStack(): Stack | null { return this.state?.stack ?? null; }
   get currentMode(): 'browse' | 'edit' { return this.mode; }
 
   /**
