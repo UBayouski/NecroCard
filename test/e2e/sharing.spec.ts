@@ -1,6 +1,6 @@
 // Sharing end to end (sharing REQ-6.2): autosave survives a reload; a share URL opens the same stack in a second
 // page and leaves a prior autosave intact; Export's download is the stack; Import loads a file.
-import { collectErrors, expect, test, type Page } from './apiMock.js';
+import { collectErrors, expect, mockUnconfiguredServer, test, type Page } from './apiMock.js';
 import type { Stack } from '../../src/model/types.js';
 
 /** Node's Buffer, reached without @types/node (the repo has none; see edit.spec.ts). */
@@ -43,6 +43,62 @@ test('autosave: an edit survives a reload with no query or fragment', async ({ p
   expect(errors).toEqual([]);
 });
 
+// A person presses F5, which reloads the URL the app itself wrote (?stack=quiz). ?stack= outranks the autosave, so
+// the app must drop it once a person edits; otherwise every reload silently reset the sample and threw the work away.
+for (const start of ['/', '/?stack=quiz']) {
+  test(`autosave: a real reload (F5) after an edit keeps the edit, starting from ${start}`, async ({ page }) => {
+    await page.goto(start);
+    await expect(surface(page)).toHaveAttribute('data-card-name', 'Title');
+    await expect(surface(page)).toHaveAttribute('data-busy', 'false');
+    await mode(page, 'Edit').click();
+    await page.getByRole('button', { name: 'Add button', exact: true }).click();
+    await inspector(page).getByLabel('Label', { exact: true }).fill('Lantern');
+    await inspector(page).getByLabel('Label', { exact: true }).blur();
+    await page.waitForTimeout(700);
+    expect(new URL(page.url()).searchParams.has('stack')).toBe(false); // the sample link is gone once it is theirs
+
+    await page.reload();
+    await expect(surface(page)).toHaveAttribute('data-busy', 'false');
+    await expect(surface(page).getByRole('button', { name: 'Lantern', exact: true })).toHaveCount(1);
+    // The reloaded stack is still named "The Haunted Quiz"; the picker must not show it twice under
+    // the bundled sample's own title, so the restored autosave is marked as the person's copy.
+    await expect(page.locator('#stack-picker option:checked')).toHaveText('The Haunted Quiz (your copy)');
+  });
+}
+
+test('autosave: playing the sample without editing keeps the link, so a reload starts it fresh', async ({ page }) => {
+  await page.goto('/?stack=quiz');
+  await expect(surface(page)).toHaveAttribute('data-card-name', 'Title');
+  await expect(surface(page)).toHaveAttribute('data-busy', 'false');
+  await surface(page).getByRole('button', { name: 'Enter if you dare...', exact: true }).click();
+  await expect(surface(page)).toHaveAttribute('data-card-name', 'Q1');
+  await expect(surface(page)).toHaveAttribute('data-busy', 'false');
+  expect(new URL(page.url()).searchParams.get('stack')).toBe('quiz');
+
+  await page.reload();
+  await expect(surface(page)).toHaveAttribute('data-card-name', 'Title'); // a fresh quiz, not mid-play
+});
+
+test('autosave: typing into an unlocked field in Browse is saved (and a reload keeps it)', async ({ page }) => {
+  await page.goto('/?stack=quiz');
+  await expect(surface(page)).toHaveAttribute('data-card-name', 'Title');
+  await expect(surface(page)).toHaveAttribute('data-busy', 'false');
+  // Make an unlocked field: add one in Edit mode, untick "Lock text", then type into it in Browse.
+  await mode(page, 'Edit').click();
+  await page.getByRole('button', { name: 'Add field', exact: true }).click();
+  await inspector(page).getByLabel('Lock text', { exact: true }).uncheck();
+  await mode(page, 'Browse').click();
+  await expect(surface(page)).toHaveAttribute('data-mode', 'browse');
+  await page.waitForTimeout(700); // let the edit-mode autosave settle so the typing below is what we test
+  const field = surface(page).locator('.field textarea.field-text');
+  await field.fill('written in browse mode');
+  await page.waitForTimeout(700);
+
+  await page.reload();
+  await expect(surface(page)).toHaveAttribute('data-busy', 'false');
+  await expect(surface(page).locator('.field textarea.field-text')).toHaveValue('written in browse mode');
+});
+
 test('share: the URL opens the same stack in a second page, and a prior autosave is kept', async ({ page, context }) => {
   const errors = collectErrors(page);
   await openQuiz(page);
@@ -56,6 +112,7 @@ test('share: the URL opens the same stack in a second page, and a prior autosave
 
   // A second page already has its own autosave. Opening the link must not overwrite it.
   const page2 = await context.newPage();
+  await mockUnconfiguredServer(page2); // the auto fixture only covers the test's own page
   const errors2 = collectErrors(page2);
   await page2.goto('/');
   await expect(surface(page2)).toHaveAttribute('data-busy', 'false');
@@ -119,6 +176,6 @@ test('export: the download decodes to the open stack; import loads a file', asyn
 
   await expect(sharePanel(page)).toHaveCount(0);
   await expect(surface(page)).toHaveAttribute('data-mode', 'edit');
-  await expect(page.locator('#stack-picker option:checked')).toHaveText('The Haunted Quiz');
+  await expect(page.locator('#stack-picker option:checked')).toHaveText('The Haunted Quiz (your copy)');
   expect(errors).toEqual([]);
 });

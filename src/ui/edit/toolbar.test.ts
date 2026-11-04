@@ -72,6 +72,16 @@ describe('edit toolbar and card menu', () => {
     expect(actions.redo).toHaveBeenCalled();
   });
 
+  it('the Card menu button draws its caret in CSS: a hidden span, so the name is just "Card"', () => {
+    const { btn } = toolbar();
+    const menuButton = btn('Card ▾'); // textContent is unchanged, so existing lookups still work
+    const caret = menuButton.querySelector('.card-menu-caret')!;
+    expect(caret.getAttribute('aria-hidden')).toBe('true');
+    expect(caret.textContent).toBe('▾');
+    expect([...menuButton.childNodes].map(n => n.nodeType)).toEqual([3, 1]); // "Card " text node, then the span
+    expect(menuButton.firstChild!.textContent).toBe('Card ');
+  });
+
   it('the card menu opens with focus on the first item, navigates with arrows, closes with Escape', () => {
     const { tb, btn } = toolbar();
     const menuButton = btn('Card ▾');

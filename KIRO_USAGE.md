@@ -592,3 +592,82 @@ directories untouched, no new dependency. The screenshot also confirms the round
 specs: a 1 px outline with a 2 px right and bottom shadow and clean corners, in place of the bevel whose white and
 black edges met in a visible seam. Kiro's note for later stands: any future URL-driven load must handle in-tab
 changes, not only the initial boot. Screenshot copied to docs/screenshots/share-opened.png.
+
+## 2026-11-04 — Spec 8: retro-skin (requirements, design, tasks)
+Surface: CLI (Auto)
+Features: spec, steering
+What I asked for: the visual pass from BRIEF section 8 and retro-ui.md: three open-licensed bitmap-style fonts with
+the license files committed, the classic 8x8 dither set in one shared module, a 1-bit card surface, a HyperCard
+window frame, a System 6 gray chrome, the inflated selection outline, the README status line, a CSS guard test and
+an MCP run. The prompt named candidate families from Google Fonts because their licenses are verifiable from the
+google/fonts repository rather than from a font site's "free for personal use" badge.
+What Kiro did: chose Silkscreen (UI), DotGothic16 (field text) and VT323 (script), all SIL OFL 1.1, and verified
+them against the repository's METADATA files because the Google Fonts site is client-rendered. It listed the four
+rejected candidates with reasons, proposed internal family aliases so no third-party name reaches the DOM, noted
+that BAYER_8 was already shared by the dissolve and the image dither so the move is a relocation only, and asked
+before using a gradient for the title-bar stripes because the steering forbids gradients on the card.
+Review: I re-verified all three licenses at the source: each sits under ofl/ in google/fonts with an OFL.txt naming
+SIL Open Font License 1.1 and the designers Kiro gave. Three corrections, all about native pixel size: DotGothic16
+is drawn on a 16-pixel grid, so field text runs at 16 px, not the 12 px in the design; Silkscreen at 8 px is for card
+buttons (the card's 2x scale makes it legible) and titles, not chrome body text, which uses DotGothic16 at 16 px;
+and DotGothic16 ships as its Latin subset, since the full file covers Japanese and weighs over a megabyte. A human
+look in Chrome is scheduled after the chrome restyle and before the e2e, as with the script editor, because font
+rendering is exactly what happy-dom cannot see.
+
+## 2026-11-04 - Spec 8: retro-skin (Tasks 1-8, implementation and verification)
+Surface: CLI (Auto)
+Features: spec, steering, MCP (Playwright), hooks
+What I asked for: Tasks 1-4 first (patterns, fonts, card restyle, window frame, chrome), then a stop for a human look
+in Chrome. After it passed: Tasks 5-8 with additions. The selection outline inflated by 2 px, a README status line and
+a Fonts note, a real-Chromium e2e for the script editor's font metrics, an MCP run against the dev server with five
+named screenshots, and the six standard checks with a clean diff outside the UI.
+What Kiro did: shipped the three OFL fonts as woff2 with FONTS.md and the license files, seven dither tiles pinned by
+tests to one generator, a CSS guard test that fails on gradients, shadows, opacity, filters, transitions, system
+fonts, non-black/white colours or non-pixel sizes inside the card surface, and the window frame in CardStage. Along the
+way it caught its own mistakes:
+- The first fixture-fit measurement was vacuous. An all:unset box-sizing quirk and hidden answers at 0x0 made every
+  field "fit". It redone it by collapsing the height and measuring scrollHeight. Every fixture field fits at 16/20 px.
+- PowerShell 5.1 stripped the double quotes from node -e, so a scripted check silently tested the wrong thing. Kiro
+  moved to a temp .cjs file and deleted it.
+- It took the existing dither-50.svg reference for a dangling one and generated a dither.css before finding the file.
+  The CSS was replaced by the seven SVG files.
+- The 2x reference came out 1028x712 against a 1027x711 window. The size mismatch exposed half-pixel centring from an
+  even viewport; the e2e now uses 1441x901. The 2x threshold was measured at 824 px, then 812 px after trimming the
+  viewport and status-line padding.
+- A <select> matched :read-only and took the wrong style. The card menu's down-arrow is outside the fonts' Latin range,
+  so it became a CSS caret in an aria-hidden span, with textContent unchanged.
+- Making the scrolling-field screenshot showed a real bug: the card is built in a detached tree, so the first scroll
+  bar update saw no overflow and the track and thumb stayed off until the first scroll. attachScrollBar now observes
+  the content with a ResizeObserver.
+- Final verification found two sharing defects. A real F5 after an edit lost the edit, because loadKey had written
+  ?stack=quiz into the URL and that outranks the autosave. And typing into an unlocked field in Browse was never
+  autosaved, though the sharing spec required it. Both fixed in main.ts and domHost.ts only (src/share untouched),
+  each with a regression test; a mutation check confirmed the Browse-typing test fails without the hook.
+Review: the "vanished" scrolling field on my first reload during the MCP run was not a rendering issue; it was the
+reload bug above, which the earlier sharing e2e missed because it only navigated to a bare /. Lesson: a reload test
+has to start from the URL the app itself wrote. Results: typecheck, lint, test, build, server:build and e2e all exit 0;
+972 unit tests in 67 files, 23 e2e tests, stable over two extra e2e reruns. src/interp, src/model, fixtures,
+src/summon, src/share and server/ are unchanged apart from the two fixes noted, package.json dependencies are
+unchanged, and no proprietary typeface name appears under src/. main.ts and three CSS files now run past the 300-line
+guideline from this spec's additions. The subpixel fringes and the title-bar height band were left as instructed.
+The one MCP console error, 502 on /api/health, is expected because only the dev server was running.
+
+## 2026-11-04 — Spec 8 closed: human check and review notes
+Surface: Claude Code (reviewer), Chrome on a 150 % display
+What the human check covered, after Tasks 1 to 4: four screens in real Chrome, where the card rendered at 3x (the
+window was wide enough). Title card, Q1 in Browse, Edit mode with the inspector open, and a selected button with its
+three-line script. The editor region was cropped and enlarged 4x to look for the ghosting that a mirror and textarea
+mismatch produces under a new font; there was none, and the gutter numbers sat on their rows. The dashed selection
+outline was visibly hiding under the rect button's border, which Task 5 then fixed. Two things were waved through on
+purpose: Silkscreen has no lowercase, so card button labels render as capitals, and the chrome at 16 CSS px looks
+small beside a 3x card, as HyperCard's own menus did.
+What the review added to Tasks 5 to 8: a real-Chromium e2e that compares the textarea's and the mirror's computed
+font metrics, because the happy-dom tests cannot see font fallback; a README live-site line and Fonts note; the
+subpixel fringes and the 2x height band left alone, since neither showed on the human check.
+One side effect found afterwards: the MCP screenshot run added a scrolling field to the quiz title card to show the
+scroll bar, and the new autosave-on-edit kept it, so the browser Playwright had opened still showed that field a
+reload later. Lesson for later MCP runs: an action that edits a stack ends by reopening the fixture from the picker
+(or clearing `necrocard.autosave`), so a human look does not inherit test data.
+Independent checks: the three font licenses were read at source in google/fonts (OFL 1.1, no Reserved Font Name
+declared); typecheck, lint, 972 unit tests, build and server:build rerun green here; the six protected areas and
+package.json dependencies unchanged; no proprietary typeface name under src/. Spec 8 closes the eight planned specs.

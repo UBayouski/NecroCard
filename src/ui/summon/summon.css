@@ -1,14 +1,18 @@
-/* Summon and Settings dialogs: chrome only (retro-ui.md). Native <dialog> top layer, so no z-index. */
+/* Summon, Settings and Share dialogs: chrome only (retro-ui.md, retro-skin REQ-4). Native <dialog> top layer, so no
+   z-index. Prose is NecroField 16px; the title is NecroUI Bold 16px; buttons come from chrome.css. */
 
 .summon-dialog {
-  width: min(560px, 92vw);
+  width: min(600px, 92vw);
   max-height: 90vh;
   padding: 10px 14px 14px;
-  border: 1px solid #1a1a1a;
+  border: 1px solid var(--chrome-line);
   background: var(--chrome-bg);
   color: var(--chrome-fg);
-  font-family: var(--font-ui);
-  font-size: 12px;
+  font-family: var(--font-field);
+  font-size: var(--font-size-text);
+  line-height: var(--line-height-text);
+  /* A modest hard shadow: allowed on chrome dialogs only. */
+  box-shadow: 3px 3px 0 var(--chrome-line);
 }
 
 .summon-dialog::backdrop {
@@ -17,8 +21,10 @@
 
 .summon-dialog-title {
   margin: 0 0 8px;
-  font-size: 12px;
-  font-weight: bold;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-title);
+  font-weight: 700;
+  line-height: var(--line-height-text);
 }
 
 .summon-dialog-body p {
@@ -40,12 +46,14 @@
 .settings-key {
   box-sizing: border-box;
   width: 100%;
-  padding: 4px 6px;
-  border: 1px solid #6b6b6b;
-  background: #ffffff;
+  padding: 2px 6px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 0;
+  background: var(--chrome-surface);
   color: #000000;
-  font-family: var(--font-ui);
-  font-size: 12px;
+  font-family: var(--font-field);
+  font-size: var(--font-size-text);
+  line-height: var(--line-height-text);
 }
 
 .summon-prompt {
@@ -55,7 +63,7 @@
 .summon-prompt:focus-visible,
 .settings-key:focus-visible,
 .summon-dialog .chrome-button:focus-visible {
-  outline: 1px dotted #000000;
+  outline: 2px solid var(--chrome-line);
   outline-offset: 1px;
 }
 
@@ -72,11 +80,11 @@
 }
 
 .summon-progress {
-  min-height: 16px;
+  min-height: 20px;
 }
 
 .summon-error {
-  color: #8a1010;
+  color: var(--chrome-error);
 }
 
 .summon-error ul {

@@ -44,6 +44,12 @@ export const CUSTOM = 'custom';
 
 export type PickerValue = FixtureName | typeof UNTITLED | typeof CUSTOM;
 
+/** Label for the custom entry; a name equal to a bundled sample's is marked as the person's copy. */
+function customLabel(name: string): string {
+  if (name.trim() === '') return 'Summoned stack';
+  return FIXTURES.some(f => f.name === name) ? `${name} (your copy)` : name;
+}
+
 /** A labelled <select> of the bundled stacks. `onChange` receives the chosen fixture key. */
 export function createStackPicker(onChange: (key: FixtureName) => void): StackPicker {
   const label = document.createElement('label');
@@ -83,7 +89,7 @@ export function createStackPicker(onChange: (key: FixtureName) => void): StackPi
     setDisabled: disabled => { select.disabled = disabled; },
     showUntitled: () => setValue(UNTITLED),
     showCustom: name => {
-      addExtra(CUSTOM, name.trim() === '' ? 'Summoned stack' : name);
+      addExtra(CUSTOM, customLabel(name));
       setValue(CUSTOM);
     },
   };

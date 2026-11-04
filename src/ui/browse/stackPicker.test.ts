@@ -83,6 +83,18 @@ describe('stack picker: summoned entry (summon REQ-8.3)', () => {
     expect(picker.select.selectedOptions[0].textContent).toBe('Summoned stack');
   });
 
+  it('a name matching a bundled sample is marked "(your copy)" so it is not listed twice under the same title', () => {
+    const picker = createStackPicker(() => {});
+    picker.showCustom('The Haunted Quiz');
+    expect(picker.select.selectedOptions[0].textContent).toBe('The Haunted Quiz (your copy)');
+  });
+
+  it('a summoned, imported or shared stack with its own name keeps the bare label', () => {
+    const picker = createStackPicker(() => {});
+    picker.showCustom('Ghost Quiz');
+    expect(picker.select.selectedOptions[0].textContent).toBe('Ghost Quiz');
+  });
+
   it('choosing a fixture or New Stack removes it; New Stack and Summon replace each other', () => {
     const picker = createStackPicker(() => {});
     picker.showCustom('A');

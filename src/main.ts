@@ -1,4 +1,5 @@
 // NecroCard entry point: browse and edit modes, stack picker, New Stack, message box.
+import './assets/fonts/fonts.css';
 import './ui/variables.css';
 import './ui/chrome.css';
 import './ui/browse/browse.css';
@@ -139,6 +140,12 @@ function boot(root: HTMLElement): void {
     dialogInert: () => [messageBox, toolbar],
     onBusyChange: () => updateToolbar(),
     onLoad: () => editor.reset(),
+    onFieldEdited: () => {
+      const s = runtime.currentStack;
+      if (!s) return;
+      leaveFixtureLink();
+      autosave.save(s);
+    },
   });
 
   const editor = new EditController({
@@ -148,17 +155,36 @@ function boot(root: HTMLElement): void {
     onModeChange: mode => toggle.set(mode),
     agent: createAgentClient(transportFor),
     // Autosave person-made edits (sharing REQ-2.1). Debounced; button scripts do not call this.
-    onChange: () => { const s = runtime.currentStack; if (s) autosave.save(s); },
+    onChange: () => {
+      const s = runtime.currentStack;
+      if (!s) return;
+      stage.setTitle(s.name); // a rename in the inspector (or its undo) shows in the window title at once
+      leaveFixtureLink();
+      autosave.save(s);
+    },
   });
 
   /** Bumped by every load, so a slow fixture import cannot replace a newer New Stack or Summon. */
   let loadSeq = 0;
+
+  /**
+   * `?stack=` is an explicit "open this sample" link, and it outranks the autosave on page load. Once a person has
+   * changed the stack it is theirs, so drop the link: a reload then restores their autosave instead of resetting to
+   * the pristine sample. (Playing without editing keeps the link, so a reload still starts the sample fresh.)
+   */
+  function leaveFixtureLink(): void {
+    const url = new URL(location.href);
+    if (!url.searchParams.has('stack')) return;
+    url.searchParams.delete('stack');
+    history.replaceState(null, '', url.toString());
+  }
 
   /** Load any stack exactly like a fixture: Browse mode, history cleared (REQ-1.4). Autosaves by default. */
   async function loadStack(stack: Stack, opts: { autosave?: boolean } = {}): Promise<boolean> {
     if (runtime.isBusy) return false;
     loadSeq++;
     editor.reset();
+    stage.setTitle(stack.name); // before the load: opening scripts (an answer dialog, say) must not delay the title
     const ok = await runtime.load(stack);
     if (ok && opts.autosave !== false) autosave.saveNow(stack);
     return ok;
@@ -200,9 +226,7 @@ function boot(root: HTMLElement): void {
       if (!(await loadStack(stack))) return;
       current = UNTITLED;
       picker.showUntitled();
-      const url = new URL(location.href);
-      url.searchParams.delete('stack');
-      history.replaceState(null, '', url.toString());
+      leaveFixtureLink();
     })();
   });
 
@@ -211,9 +235,7 @@ function boot(root: HTMLElement): void {
     if (!(await loadStack(stack))) throw new Error('A script is still running. Try again when it finishes.');
     current = CUSTOM;
     picker.showCustom(stack.name);
-    const url = new URL(location.href);
-    url.searchParams.delete('stack');
-    history.replaceState(null, '', url.toString());
+    leaveFixtureLink();
     if (!editor.enter()) status.show('The stack is loaded. Switch to Edit when its opening scripts finish.');
   }
 
@@ -255,7 +277,10 @@ function boot(root: HTMLElement): void {
     void runtime.runMessageBox(line).then(() => {
       // The message box is a person action, so persist any change it made (sharing REQ-2.1).
       const s = runtime.currentStack;
-      if (s) autosave.save(s);
+      if (s) {
+        leaveFixtureLink();
+        autosave.save(s);
+      }
       messageBox.focus();
       messageBox.select();
     });

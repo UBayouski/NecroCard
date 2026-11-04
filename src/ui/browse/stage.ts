@@ -1,13 +1,16 @@
 import { CARD_HEIGHT, CARD_WIDTH, computeScale } from './scale.js';
 
 /**
- * The card viewport: a flexible chrome area containing a wrapper sized to the scaled card,
- * which holds the fixed 512 × 342 `.card-surface` scaled with `transform: scale()`.
+ * The card viewport: a flexible chrome area containing a HyperCard-style window (title bar + frame) sized to the
+ * scaled card, which holds the fixed 512 × 342 `.card-surface` scaled with `transform: scale()`.
  * Dialogs and transition layers are children of the surface so they scale with it.
  */
 export class CardStage {
   readonly viewport: HTMLElement;
   readonly surface: HTMLElement;
+  private readonly window: HTMLElement;
+  private readonly titleBar: HTMLElement;
+  private readonly titleLabel: HTMLElement;
   private readonly frame: HTMLElement;
   private observer: ResizeObserver | null = null;
   private scale = 1;
@@ -15,6 +18,15 @@ export class CardStage {
   constructor(doc: Document = document) {
     this.viewport = doc.createElement('main');
     this.viewport.className = 'card-viewport';
+    this.window = doc.createElement('div');
+    this.window.className = 'card-window';
+    // Decorative: the stack name is already in the picker, so a screen reader need not hear it twice.
+    this.titleBar = doc.createElement('div');
+    this.titleBar.className = 'card-window-title';
+    this.titleBar.setAttribute('aria-hidden', 'true');
+    this.titleLabel = doc.createElement('span');
+    this.titleLabel.className = 'card-window-title-label';
+    this.titleBar.append(this.titleLabel);
     this.frame = doc.createElement('div');
     this.frame.className = 'card-frame';
     this.surface = doc.createElement('div');
@@ -26,7 +38,17 @@ export class CardStage {
     this.surface.dataset.busy = 'false';
     this.surface.dataset.mode = 'browse';
     this.frame.append(this.surface);
-    this.viewport.append(this.frame);
+    this.window.append(this.titleBar, this.frame);
+    this.viewport.append(this.window);
+  }
+
+  /** The stack name shown in the window's title bar. */
+  setTitle(name: string): void {
+    this.titleLabel.textContent = name;
+  }
+
+  get title(): string {
+    return this.titleLabel.textContent ?? '';
   }
 
   /** Start fitting the card to the viewport; call after the viewport is in the document. */
@@ -45,15 +67,22 @@ export class CardStage {
     this.observer = null;
   }
 
-  /** Recompute the scale from the viewport's content box minus the frame border (REQ-1.2). */
+  /**
+   * Recompute the scale from the viewport's content box minus everything the window adds around the card:
+   * its borders, the title bar, and the frame border (REQ-1.2).
+   */
   fit(): void {
     const view = this.viewport.ownerDocument.defaultView;
     const px = (v: string | undefined) => parseFloat(v ?? '') || 0;
     const vs = view?.getComputedStyle(this.viewport);
+    const ws = view?.getComputedStyle(this.window);
     const fs = view?.getComputedStyle(this.frame);
     const w = this.viewport.clientWidth - px(vs?.paddingLeft) - px(vs?.paddingRight)
+      - px(ws?.borderLeftWidth) - px(ws?.borderRightWidth)
       - px(fs?.borderLeftWidth) - px(fs?.borderRightWidth);
     const h = this.viewport.clientHeight - px(vs?.paddingTop) - px(vs?.paddingBottom)
+      - px(ws?.borderTopWidth) - px(ws?.borderBottomWidth)
+      - this.titleBar.offsetHeight
       - px(fs?.borderTopWidth) - px(fs?.borderBottomWidth);
     this.applyScale(w > 0 && h > 0 ? computeScale(w, h) : 1);
   }

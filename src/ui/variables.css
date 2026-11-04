@@ -8,15 +8,25 @@
   --black: #000000;
   --white: #ffffff;
 
-  /* Chrome (light Mac gray theme) */
+  /* Chrome (light Mac gray theme). Flat 1px borders, no gradients; shadows only on chrome dialogs. */
   --chrome-bg: #f0f0f0;
   --chrome-fg: #1a1a1a;
   --chrome-muted: #6b6b6b;
+  --chrome-line: #1a1a1a;      /* control outlines and the toolbar rule */
+  --chrome-rule: #c8c8c8;      /* hairline separators inside panels */
+  --chrome-surface: #ffffff;   /* text inputs, menus, the script editor */
+  --chrome-error: #8a1010;
 
-  /* Font stacks. Generic fallbacks until retro-skin bundles open-licensed bitmap fonts. */
-  --font-ui: sans-serif;
-  --font-field: sans-serif;
-  --font-script: monospace;
+  /* Bundled bitmap fonts (src/assets/fonts/fonts.css). Each is used at its native pixel size, in whole pixels.
+     The generic family is only a last resort if a file fails to load. */
+  --font-ui: "NecroUI", monospace;          /* card buttons (8px), titles (16px bold) */
+  --font-field: "NecroField", monospace;    /* card field text and chrome body text (16px / 20px) */
+  --font-script: "NecroScript", monospace;  /* script editor and message box (16px / 20px) */
+
+  --font-size-ui: 8px;        /* NecroUI Regular on card buttons; the card's 2x scale makes it 16 screen pixels */
+  --font-size-title: 16px;    /* NecroUI Bold: window title, app name, dialog titles */
+  --font-size-text: 16px;     /* NecroField / NecroScript */
+  --line-height-text: 20px;
 
   /* z-index bands (retro-ui: <= 100 for normal content, <= 1000 for modal dialogs) */
   --z-card-layer: 1;

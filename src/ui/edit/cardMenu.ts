@@ -23,7 +23,14 @@ export function createCardMenu(actions: CardMenuActions): CardMenu {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'chrome-button';
-  button.textContent = 'Card ▾';
+  // The caret is drawn in CSS: the menu glyph is outside the bundled fonts' character range, so it would be drawn by a
+  // system font. textContent stays "Card ▾"; the span is hidden from assistive technology (the name is "Card").
+  button.append('Card ');
+  const caret = document.createElement('span');
+  caret.className = 'card-menu-caret';
+  caret.setAttribute('aria-hidden', 'true');
+  caret.textContent = '▾';
+  button.append(caret);
   button.setAttribute('aria-haspopup', 'menu');
   button.setAttribute('aria-expanded', 'false');
   button.setAttribute('aria-controls', menuId);

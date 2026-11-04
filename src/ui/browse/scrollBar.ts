@@ -1,7 +1,7 @@
 /** Arrow and thumb size of the classic 1-bit scroll bar, in logical pixels. */
 export const SCROLL_BAR_SIZE = 16;
-/** One line of field text (12px font × 1.2 line height, rounded to the pixel grid). */
-export const LINE_PX = 14;
+/** One line of field text (16px font on a 20px line, the NecroField native size). */
+export const LINE_PX = 20;
 
 /**
  * Thumb offset within the track for a given scroll state. Pure so it can be tested
@@ -62,6 +62,9 @@ export function attachScrollBar(field: HTMLElement, content: HTMLElement, innerH
     scrollBy(e.offsetY < thumbTop ? -page : page);
   });
   content.addEventListener('scroll', update);
+  // A card is built in a detached tree, where scrollHeight and clientHeight are both 0, so the first update() above
+  // always sees "no overflow". Re-run it when the content is first laid out (and on any later resize).
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => update()).observe(content);
 
   field.append(bar);
   update();

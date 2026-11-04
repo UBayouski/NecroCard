@@ -13,16 +13,23 @@
 .tok-space { color: #1a1a1a; }
 .tok-invalid { color: #8a1010; text-decoration: underline dotted #8a1010; }
 
-/* Shared text metrics for the textarea, its mirror and the gutter. */
+/* The one source of code-font metrics (NecroScript 16px on a 20px line) for the editor textarea, its mirror, the
+   gutter and the message box with its mirror, so every layer lays out identically and stays aligned. */
+.code-metrics,
+.message-box,
+.message-box-mirror {
+  font-family: var(--font-script);
+  font-size: var(--font-size-text);
+  line-height: var(--line-height-text);
+  letter-spacing: 0;
+}
+
+/* Box model for the textarea, its mirror and the gutter. */
 .code-metrics {
   box-sizing: border-box;
   margin: 0;
   padding: 4px 6px;
   border: 0;
-  font-family: var(--font-script);
-  font-size: 12px;
-  line-height: 16px;
-  letter-spacing: 0;
   tab-size: 2;
   white-space: pre;
   overflow-wrap: normal;
@@ -39,14 +46,14 @@
   display: flex;
   overflow: hidden;
   resize: vertical;
-  border: 1px solid #8a8a8a;
-  background: #ffffff;
-  min-height: 42px;
+  border: 1px solid var(--chrome-line);
+  background: var(--chrome-surface);
+  min-height: 50px;
 }
 
-/* 10 or 24 visible rows: rows × 16px line height + 8px padding + 2px border */
-.code-editor--rows-10 .code-editor-body { height: 170px; }
-.code-editor--rows-24 .code-editor-body { height: 394px; }
+/* 10 or 24 visible rows: rows × 20px line height + 8px padding + 2px border */
+.code-editor--rows-10 .code-editor-body { height: 210px; }
+.code-editor--rows-24 .code-editor-body { height: 490px; }
 
 .code-editor-gutter {
   flex: 0 0 auto;
@@ -54,9 +61,9 @@
   padding-left: 4px;
   padding-right: 4px;
   overflow: hidden;
-  border-right: 1px solid #d0d0d0;
-  background: #f4f4f4;
-  color: #6b6b6b;
+  border-right: 1px solid var(--chrome-rule);
+  background: var(--chrome-bg);
+  color: #5f5f5f;
   text-align: right;
   user-select: none;
 }
@@ -109,30 +116,31 @@
 }
 
 .code-editor-body:focus-within {
-  outline: 2px solid #1a1a1a;
+  outline: 2px solid var(--chrome-line);
   outline-offset: 1px;
 }
 
 .code-editor--readonly .code-editor-body {
-  background: #f7f7f7;
+  background: var(--chrome-bg);
 }
 
 .script-line--error {
-  text-decoration: underline wavy #8a1010;
+  text-decoration: underline wavy var(--chrome-error);
   text-decoration-skip-ink: none;
   text-underline-offset: 2px;
 }
 
 .code-editor-status {
-  min-height: 14px;
-  color: #6b6b6b;
-  font-family: var(--font-ui);
-  font-size: 11px;
+  min-height: 20px;
+  color: var(--chrome-muted);
+  font-family: var(--font-field);
+  font-size: var(--font-size-text);
+  line-height: var(--line-height-text);
   overflow-wrap: anywhere;
 }
 
 .code-editor-status--error {
-  color: #8a1010;
+  color: var(--chrome-error);
 }
 
 /* ------------------------------------------------------------------ slot: actions, explanation, diff */
@@ -163,10 +171,11 @@
 
 .script-explanation {
   padding: 6px 8px;
-  border: 1px solid #c8c8c8;
-  background: #ffffff;
-  font-family: var(--font-ui);
-  font-size: 12px;
+  border: 1px solid var(--chrome-line);
+  background: var(--chrome-surface);
+  font-family: var(--font-field);
+  font-size: var(--font-size-text);
+  line-height: var(--line-height-text);
 }
 
 .script-explanation p {
@@ -176,16 +185,17 @@
 }
 
 .diff-view {
-  border: 1px solid #8a8a8a;
-  background: #ffffff;
+  border: 1px solid var(--chrome-line);
+  background: var(--chrome-surface);
   padding: 6px;
 }
 
 .diff-view-heading {
   margin: 0 0 6px;
-  font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: bold;
+  font-family: var(--font-field);
+  font-size: var(--font-size-text);
+  font-weight: 400;
+  line-height: var(--line-height-text);
 }
 
 .diff-view-scroll {
@@ -196,8 +206,8 @@
 
 .diff-view-table {
   border-collapse: collapse;
-  font-size: 12px;
-  line-height: 16px;
+  font-size: var(--font-size-text);
+  line-height: var(--line-height-text);
 }
 
 .diff-view-table th {
@@ -228,25 +238,30 @@
 }
 
 .diff-row--del { background: #f6e3e3; }
-.diff-row--del .diff-text { text-decoration: line-through; text-decoration-color: #8a1010; }
+.diff-row--del .diff-text { text-decoration: line-through; text-decoration-color: var(--chrome-error); }
 .diff-row--add { background: #e3f1e6; }
 
 .diff-view-empty {
   margin: 0 0 6px;
-  font-family: var(--font-ui);
-  font-size: 12px;
+  font-family: var(--font-field);
+  font-size: var(--font-size-text);
+  line-height: var(--line-height-text);
 }
 
 /* ------------------------------------------------------------------ Expand dialog */
 
 .expand-dialog {
-  width: min(640px, 92vw);
+  width: min(720px, 92vw);
   max-height: 90vh;
   padding: 10px 14px 14px;
-  border: 1px solid #1a1a1a;
+  border: 1px solid var(--chrome-line);
   background: var(--chrome-bg);
   color: var(--chrome-fg);
-  font-size: 12px;
+  font-family: var(--font-field);
+  font-size: var(--font-size-text);
+  line-height: var(--line-height-text);
+  /* A modest hard shadow: allowed on chrome dialogs only. */
+  box-shadow: 3px 3px 0 var(--chrome-line);
 }
 
 .expand-dialog::backdrop {
@@ -262,8 +277,10 @@
 
 .expand-dialog-title {
   margin: 0;
-  font-size: 12px;
-  font-weight: bold;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-title);
+  font-weight: 700;
+  line-height: var(--line-height-text);
 }
 
 /* ------------------------------------------------------------------ message box */
@@ -294,20 +311,21 @@
   color: transparent;
 }
 
+/* Font metrics come from the shared code-metrics rule above. */
 .message-box-mirror {
   position: absolute;
   inset: 0;
   overflow: hidden;
   padding: 2px 8px;
   box-sizing: border-box;
-  font-family: var(--font-script);
-  font-size: 12px;
-  line-height: 20px;
   white-space: pre;
   pointer-events: none;
 }
 
-.message-box-wrap:has(.message-box:disabled) .message-box-mirror,
-.message-box-wrap--disabled .message-box-mirror {
-  opacity: 0.55;
+/* Inactive (running a script, or in Edit mode): a sparse 12.5 % dither under black text, not a grey. */
+.message-box-wrap:has(.message-box:disabled),
+.message-box-wrap--disabled {
+  background-image: url("../../assets/patterns/dither-12-5.svg");
+  background-size: 8px 8px;
+  image-rendering: pixelated;
 }

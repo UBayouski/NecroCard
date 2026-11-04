@@ -40,6 +40,57 @@ describe('CardStage', () => {
     expect(stage.currentScale).toBe(1);
   });
 
+  describe('the HyperCard window around the card', () => {
+    const layout = (stage: CardStage, w: number, h: number, titleH: number) => {
+      Object.defineProperty(stage.viewport, 'clientWidth', { value: w, configurable: true });
+      Object.defineProperty(stage.viewport, 'clientHeight', { value: h, configurable: true });
+      const title = stage.viewport.querySelector<HTMLElement>('.card-window-title')!;
+      Object.defineProperty(title, 'offsetHeight', { value: titleH, configurable: true });
+      return stage.viewport.querySelector<HTMLElement>('.card-window')!;
+    };
+
+    it('puts a decorative title bar above the frame, inside one window', () => {
+      const stage = new CardStage();
+      const win = stage.viewport.querySelector('.card-window')!;
+      expect([...win.children].map(c => c.className)).toEqual(['card-window-title', 'card-frame']);
+      expect(win.querySelector('.card-window-title')!.getAttribute('aria-hidden')).toBe('true');
+      expect(win.querySelector('.card-frame')!.contains(stage.surface)).toBe(true);
+    });
+
+    it('setTitle shows the stack name as text, never as HTML', () => {
+      const stage = new CardStage();
+      expect(stage.title).toBe('');
+      stage.setTitle('The <b>Haunted</b> Quiz');
+      expect(stage.title).toBe('The <b>Haunted</b> Quiz');
+      expect(stage.viewport.querySelector('.card-window-title b')).toBeNull();
+      stage.setTitle('');
+      expect(stage.title).toBe('');
+    });
+
+    it('fit subtracts the title bar: 700px of height minus a 24px bar no longer fits two cards', () => {
+      const stage = new CardStage();
+      layout(stage, 2000, 700, 24);
+      stage.fit();
+      expect(stage.currentScale).toBe(1); // 676 / 342 < 2
+      layout(stage, 2000, 700, 0);
+      stage.fit();
+      expect(stage.currentScale).toBe(2); // 700 / 342 >= 2, so the bar's height is what changed the answer
+    });
+
+    it('fit also subtracts the window borders', () => {
+      const stage = new CardStage();
+      document.body.append(stage.viewport); // computed styles exist only for attached elements, as in the app
+      const win = layout(stage, 2000, 710, 24);
+      // A border only has a computed width when it has a style, as in a real browser.
+      win.style.cssText = 'border-top: 1px solid #000; border-bottom: 2px solid #000';
+      stage.fit();
+      expect(stage.currentScale).toBe(1); // 710 - 3 - 24 = 683 < 684
+      win.style.cssText = '';
+      stage.fit();
+      expect(stage.currentScale).toBe(2); // 686 >= 684
+    });
+  });
+
   it('setCardLayer replaces the shown layer and keeps other children', () => {
     const stage = new CardStage();
     const overlay = document.createElement('div');

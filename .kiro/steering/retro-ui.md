@@ -35,7 +35,9 @@ shadows, no blur filters, no opacity transitions on card content.
 ## Typography
 
 - **UI chrome** (menus, inspector, toolbar): classic Mac-style bitmap font for UI. Use the web font from
-  `src/assets/fonts/`. Class: `font-ui`.
+  `src/assets/fonts/`. Class: `font-ui`. In this project `font-ui` is for card buttons and titles (the window title,
+  the app name, dialog titles); chrome body text (toolbar buttons, picker, inspector labels, dialog prose) uses the
+  field font at 16px.
 - **Card field text**: classic Mac-style proportional bitmap font from `src/assets/fonts/`. Class: `font-field`.
 - **Script editor**: classic Mac-style monospace bitmap font. Class: `font-script`.
 - All three fonts must be loaded via `@font-face` in `src/assets/fonts/fonts.css`.

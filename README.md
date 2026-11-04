@@ -5,7 +5,7 @@ and HyperTalk-style scripts. Then click through it, edit it, and share it by URL
 
 Built for **Kiroween 2026**, category **Resurrection**, with [Kiro](https://kiro.dev).
 
-> Status: scaffolding. Nothing runs yet.
+> Live at **[necrocard.onrender.com](https://necrocard.onrender.com)**.
 
 ## What it is
 
@@ -19,6 +19,11 @@ them, and writing small English-like scripts. NecroCard brings that model back i
 - **Summon.** Type a description, get a working stack with scripts. Explain and fix scripts in the editor.
 - **Share.** Save locally, export JSON, or share a stack by URL.
 - **Look.** 1-bit Macintosh: classic Mac-style bitmap fonts, dither patterns, bevelled buttons, dissolve transitions.
+
+## Fonts
+
+The three bundled bitmap-style fonts, their designers and their licenses (SIL Open Font License 1.1) are listed in
+[`src/assets/fonts/FONTS.md`](src/assets/fonts/FONTS.md).
 
 ## Run
 

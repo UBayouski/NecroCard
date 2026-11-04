@@ -4,14 +4,22 @@ import { HANDLE_SIZE, HANDLES, handlePoints } from './geometry.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
+/**
+ * The selection outline is drawn this many pixels outside the object's rect on every side, so it clears a round
+ * rect button's 2px border and shows on every button style. The handles are not inflated: they stay centred on
+ * the true rect's corners and edge midpoints.
+ */
+export const OUTLINE_INFLATE = 2;
+
 const CURSOR: Record<string, string> = {
   nw: 'nwse', se: 'nwse', ne: 'nesw', sw: 'nesw', n: 'ns', s: 'ns', e: 'ew', w: 'ew',
 };
 
 /**
  * Edit-mode overlay on the card surface (REQ-2.1, REQ-2.4): dotted outlines for hidden card
- * objects, and for the selection a 1px dashed outline (4px dash, 4px gap) with eight 4 × 4
- * handles. Everything is 1-bit and positioned in logical pixels, so it scales with the card.
+ * objects, and for the selection a 1px dashed outline (4px dash, 4px gap) drawn OUTLINE_INFLATE px outside the
+ * object, with eight 4 × 4 handles on the object's own rect. Everything is 1-bit and positioned in logical
+ * pixels, so it scales with the card.
  */
 export class EditOverlay {
   readonly el: HTMLDivElement;
@@ -73,11 +81,14 @@ export class EditOverlay {
       return;
     }
     this.selection.hidden = false;
-    applyRect(this.outline as unknown as HTMLElement, rect);
-    this.outline.setAttribute('width', String(rect.w));
-    this.outline.setAttribute('height', String(rect.h));
-    this.outlineRect.setAttribute('width', String(Math.max(0, rect.w - 1)));
-    this.outlineRect.setAttribute('height', String(Math.max(0, rect.h - 1)));
+    // The outline sits OUTLINE_INFLATE px outside the rect; the handles below still use the rect itself.
+    const k = OUTLINE_INFLATE;
+    const outer: Rect = { x: rect.x - k, y: rect.y - k, w: rect.w + 2 * k, h: rect.h + 2 * k };
+    applyRect(this.outline as unknown as HTMLElement, outer);
+    this.outline.setAttribute('width', String(outer.w));
+    this.outline.setAttribute('height', String(outer.h));
+    this.outlineRect.setAttribute('width', String(Math.max(0, outer.w - 1)));
+    this.outlineRect.setAttribute('height', String(Math.max(0, outer.h - 1)));
     const points = handlePoints(rect);
     const half = HANDLE_SIZE / 2;
     for (const h of HANDLES) {

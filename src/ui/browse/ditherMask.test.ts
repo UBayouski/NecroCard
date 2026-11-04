@@ -1,16 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BAYER_8, ditherMaskSvg, ditherMaskUrl, maskCoverage } from './ditherMask.js';
-
-describe('BAYER_8', () => {
-  it('is a permutation of 0..63', () => {
-    expect(BAYER_8.length).toBe(64);
-    expect([...BAYER_8].sort((a, b) => a - b)).toEqual(Array.from({ length: 64 }, (_, i) => i));
-  });
-
-  it('has the standard first row', () => {
-    expect(BAYER_8.slice(0, 8)).toEqual([0, 32, 8, 40, 2, 34, 10, 42]);
-  });
-});
+import { ditherMaskSvg, ditherMaskUrl, maskCoverage } from './ditherMask.js';
 
 describe('dither masks', () => {
   it('coverage goes 0 → 64 and never decreases', () => {

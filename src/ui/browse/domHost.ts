@@ -19,6 +19,8 @@ export interface DomHostOptions {
   dialogInert?: () => HTMLElement[];
   /** Override the beep (tests). */
   beep?: () => void;
+  /** Called when a person types into an unlocked field in Browse (never for a script's change); for autosave. */
+  onFieldEdited?: () => void;
 }
 
 let audio: AudioContext | null = null;
@@ -186,7 +188,10 @@ export class DomHost implements HostInterface {
     return renderCard(this.state.stack, index, {
       onFieldInput: (id, text) => {
         const obj = findObjectById(this.state.stack, this.state.cardIndex, id);
-        if (obj?.type === 'field') obj.text = text;
+        if (obj?.type === 'field') {
+          obj.text = text;
+          this.options.onFieldEdited?.(); // a person typed (not a script): the app may autosave
+        }
       },
     });
   }

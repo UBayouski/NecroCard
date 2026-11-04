@@ -1,4 +1,10 @@
-/* Chrome around the card: light Mac gray theme. Never inherited by .card-surface (it resets). */
+/* Chrome around the card: a quiet System 6 desktop in light Mac gray (retro-skin REQ-4).
+   Flat 1px borders, no gradients, no CSS transitions. Body text is NecroField 16px on a 20px line; NecroUI Bold is for
+   the app name and titles only. Never inherited by .card-surface (it resets). */
+
+.font-ui { font-family: var(--font-ui); }
+.font-field { font-family: var(--font-field); }
+.font-script { font-family: var(--font-script); }
 
 html,
 body {
@@ -9,8 +15,11 @@ body {
 body {
   background: var(--chrome-bg);
   color: var(--chrome-fg);
-  font-family: var(--font-ui);
-  font-size: 12px;
+  font-family: var(--font-field);
+  font-size: var(--font-size-text);
+  line-height: var(--line-height-text);
+  /* The bitmap faces have one weight each: never synthesize a smeared bold or italic. */
+  font-synthesis: none;
 }
 
 .app {
@@ -19,25 +28,117 @@ body {
   height: 100vh;
 }
 
+/* ------------------------------------------------------------------ toolbar */
+
 .chrome-toolbar {
   display: flex;
   flex: 0 0 auto;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
-  padding: 6px 12px;
-  border-bottom: 1px solid #c8c8c8;
+  gap: 4px 12px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--chrome-line);
 }
 
 .chrome-title {
   margin: 0;
-  font-size: 12px;
-  font-weight: bold;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-title);
+  font-weight: 700;
+  line-height: var(--line-height-text);
+}
+
+.stack-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .stack-picker select {
-  font-family: var(--font-ui);
-  font-size: 12px;
+  height: 28px;
+  padding: 0 4px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 0;
+  background: var(--chrome-surface);
+  color: var(--chrome-fg);
+  font-family: var(--font-field);
+  font-size: var(--font-size-text);
+  line-height: var(--line-height-text);
 }
+
+.stack-picker select:disabled {
+  color: var(--chrome-muted);
+}
+
+/* A System 6 push button: a 1px outline, thicker on the right and bottom for the shadow (one colour, so the corners
+   never show a seam), pressed in on :active. Widths always sum the same, so nothing shifts. */
+.chrome-button {
+  padding: 2px 10px;
+  border: solid var(--chrome-line);
+  border-width: 1px 2px 2px 1px;
+  border-radius: 0;
+  background: var(--chrome-surface);
+  color: var(--chrome-fg);
+  font-family: var(--font-field);
+  font-size: var(--font-size-text);
+  line-height: var(--line-height-text);
+  cursor: default;
+}
+
+.chrome-button:active:not(:disabled):not([aria-disabled="true"]) {
+  border-width: 2px 1px 1px 2px;
+  background: var(--chrome-line);
+  color: var(--chrome-surface);
+}
+
+.chrome-button:disabled,
+.chrome-button[aria-disabled="true"] {
+  border-color: var(--chrome-muted);
+  background: var(--chrome-bg);
+  color: var(--chrome-muted);
+}
+
+.chrome-toolbar :focus-visible {
+  outline: 2px solid var(--chrome-line);
+  outline-offset: 1px;
+}
+
+/* ------------------------------------------------------------------ status line, message box */
+
+.status-line {
+  flex: 0 0 auto;
+  min-height: 20px;
+  padding: 0 12px;
+  color: var(--chrome-error);
+  font-family: var(--font-field);
+  font-size: var(--font-size-text);
+  line-height: var(--line-height-text);
+}
+
+/* Font metrics come from the shared code-metrics rule in script-editor.css. */
+.message-box {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  padding: 2px 8px;
+  border: 0;
+  border-top: 1px solid #000000;
+  background: #ffffff;
+  color: #000000;
+}
+
+.message-box:focus-visible {
+  outline: 1px dotted #000000;
+  outline-offset: -3px;
+}
+
+.message-box:disabled {
+  color: var(--chrome-muted);
+}
+
+/* ------------------------------------------------------------------ the card in its window */
 
 .card-viewport {
   display: flex;
@@ -47,7 +148,7 @@ body {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: 12px;
+  padding: 8px;
   box-sizing: border-box;
 }
 
@@ -62,41 +163,59 @@ body {
   display: none;
 }
 
-.card-frame {
+/* A HyperCard-style window: a 1px black outline with a 1px shadow at the right and bottom (the same single-colour
+   border trick as the buttons), a title bar with the stack name between horizontal stripes, and the card inside.
+   The stripes are chrome, so a gradient is allowed here; the card surface itself never has one. */
+.card-window {
+  display: flex;
   flex: 0 0 auto;
-  border: 1px solid #000000;
-}
-
-.status-line {
-  flex: 0 0 auto;
-  min-height: 16px;
-  padding: 2px 12px;
-  color: #8a1010;
-  font-family: var(--font-ui);
-  font-size: 12px;
-}
-
-.message-box {
-  flex: 0 0 auto;
+  flex-direction: column;
   box-sizing: border-box;
-  width: 100%;
+  border: solid #000000;
+  border-width: 1px 2px 2px 1px;
+  background: #ffffff;
+}
+
+.card-window-title {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  box-sizing: border-box;
   height: 24px;
-  margin: 0;
-  padding: 2px 8px;
-  border: 0;
-  border-top: 1px solid #000000;
+  padding: 0 6px;
+  gap: 8px;
+  border-bottom: 1px solid #000000;
   background: #ffffff;
   color: #000000;
-  font-family: var(--font-script);
-  font-size: 12px;
 }
 
-.message-box:focus-visible {
-  outline: 1px dotted #000000;
-  outline-offset: -3px;
+.card-window-title::before,
+.card-window-title::after {
+  content: "";
+  flex: 1 1 0;
+  min-width: 8px;
+  height: 12px;
+  background: repeating-linear-gradient(to bottom, #000000 0, #000000 1px, #ffffff 1px, #ffffff 2px);
 }
 
-.message-box:disabled,
-.stack-picker select:disabled {
-  color: var(--chrome-muted);
+.card-window-title-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-title);
+  font-weight: 700;
+  line-height: var(--line-height-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-window-title-label:empty {
+  display: none;
+}
+
+/* The window outlines the card, so the card frame has no border of its own. */
+.card-frame {
+  flex: 0 0 auto;
+  border: 0;
 }

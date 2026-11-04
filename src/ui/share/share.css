@@ -1,18 +1,21 @@
-/* Share dialog: a few rules on top of the summon dialog styles (.summon-dialog, .summon-* reused). */
+/* Share dialog: a few rules on top of the summon dialog styles (.summon-dialog and .summon-* are reused). */
 
+/* The link is code-like text, so it uses the script font on the same 20px line. */
 .share-url {
   box-sizing: border-box;
   width: 100%;
-  padding: 4px 6px;
-  border: 1px solid #6b6b6b;
-  background: #ffffff;
+  padding: 2px 6px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 0;
+  background: var(--chrome-surface);
   color: #000000;
   font-family: var(--font-script);
-  font-size: 12px;
+  font-size: var(--font-size-text);
+  line-height: var(--line-height-text);
 }
 
 .share-url:focus-visible {
-  outline: 1px dotted #000000;
+  outline: 2px solid var(--chrome-line);
   outline-offset: 1px;
 }
 

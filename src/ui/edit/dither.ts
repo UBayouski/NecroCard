@@ -1,4 +1,4 @@
-import { BAYER_8 } from '../browse/ditherMask.js';
+import { BAYER_8 } from '../patterns.js';
 import { MIN_SIZE } from './geometry.js';
 
 /** Largest side of an image added with "Add image" (REQ-4.4, open question 8). */
