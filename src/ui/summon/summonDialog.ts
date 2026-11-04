@@ -8,7 +8,7 @@ import type { WakeState } from '../../summon/wake.js';
 import { chromeButton, createDialogShell, type DialogShell } from './dialogShell.js';
 
 export const EXAMPLE_PROMPTS: readonly string[] = [
-  'A two-card quiz about haunted houses with a score field and a Results card.',
+  'A two-question quiz about haunted houses with a score field and a Results card.',
   'A choose-your-own-adventure in a crypt with three rooms and a way out.',
   'Flashcards for five Halloween words: show the word, click to reveal the meaning, Next and Prev buttons.',
 ];

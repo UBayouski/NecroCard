@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import quiz from '../../../fixtures/quiz.necrocard.json' with { type: 'json' };
-import { FRAGMENT_PARAM } from '../../share/autosave.js';
+import { FRAGMENT_PARAM } from '../../share/library.js';
 import { ShareImportError } from '../../share/file.js';
 import type { Stack } from '../../model/types.js';
 import { SHARE_TEXT, SHARE_URL_WARN, ShareDialog, type ShareDialogDeps } from './shareDialog.js';

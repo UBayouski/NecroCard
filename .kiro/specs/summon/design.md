@@ -279,7 +279,7 @@ check does not block summoning (the summon request itself will wake the service)
 
 Chrome native `<dialog>` opened with `showModal()` (same pattern as the Expand dialog, shared via
 `src/ui/summon/dialogShell.ts`): the browser traps focus and makes the rest of the page inert. Example prompts:
-1. `A two-card quiz about haunted houses with a score field and a Results card.`
+1. `A two-question quiz about haunted houses with a score field and a Results card.`
 2. `A choose-your-own-adventure in a crypt with three rooms and a way out.`
 3. `Flashcards for five Halloween words: show the word, click to reveal the meaning, Next and Prev buttons.`
 

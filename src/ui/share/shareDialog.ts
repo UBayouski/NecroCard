@@ -2,7 +2,7 @@
 // Reuses the summon dialog shell and styles. All text is set with textContent.
 import type { Stack } from '../../model/types.js';
 import { encodeStack as defaultEncode } from '../../share/codec.js';
-import { FRAGMENT_PARAM } from '../../share/autosave.js';
+import { FRAGMENT_PARAM } from '../../share/library.js';
 import {
   exportStack as defaultExport, pickStackFile, readStackFile, ShareImportError,
 } from '../../share/file.js';

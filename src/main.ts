@@ -1,4 +1,4 @@
-// NecroCard entry point: browse and edit modes, stack picker, New Stack, message box.
+// NecroCard entry point: browse and edit modes, stack picker, New Stack, message box, stack library.
 import './assets/fonts/fonts.css';
 import './ui/variables.css';
 import './ui/chrome.css';
@@ -12,8 +12,10 @@ import type { Stack } from './model/types.js';
 import { CardStage } from './ui/browse/stage.js';
 import { BrowseRuntime, type StatusLine } from './ui/browse/runtime.js';
 import {
-  createStackPicker, CUSTOM, fixtureFromSearch, UNTITLED, urlWithFixture, type PickerValue,
+  createStackPicker, urlWithFixture, type PickerChoice,
 } from './ui/browse/stackPicker.js';
+import { createDeleteControl } from './ui/browse/libraryControls.js';
+import { createPersist, type OpenTarget } from './ui/browse/persist.js';
 import { EditController } from './ui/edit/editor.js';
 import { createModeToggle } from './ui/edit/modeToggle.js';
 import { createNewStack } from './ui/edit/newStack.js';
@@ -26,15 +28,23 @@ import { createDirectTransport, KEY_STORAGE, testDirectKey } from './summon/dire
 import { createServerTransport } from './summon/serverTransport.js';
 import type { Transport } from './summon/transport.js';
 import { createWakeState } from './summon/wake.js';
-import { chooseInitialLoad, createAutosave, DEFAULT_FIXTURE, type StorageLike } from './share/autosave.js';
+import { chooseInitialLoad, createLibrary, DEFAULT_FIXTURE, type StorageLike } from './share/library.js';
 import { decodeStack } from './share/codec.js';
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-/** localStorage wrapped so a disabled or full store never throws (privacy mode, quota). */
+/** localStorage wrapped so a disabled or full store never throws (privacy mode, quota). For the key callers. */
 const safeStorage: StorageLike & { getItem(k: string): string | null } = {
   getItem: k => { try { return localStorage.getItem(k); } catch { return null; } },
   setItem: (k, v) => { try { localStorage.setItem(k, v); } catch { /* unavailable */ } },
+  removeItem: k => { try { localStorage.removeItem(k); } catch { /* nothing stored */ } },
+};
+
+/** The library needs to detect a quota failure, so its setItem rethrows; reads and removes still swallow. */
+const libraryStorage: StorageLike = {
+  getItem: k => { try { return localStorage.getItem(k); } catch { return null; } },
+  setItem: (k, v) => localStorage.setItem(k, v),
+  removeItem: k => { try { localStorage.removeItem(k); } catch { /* nothing stored */ } },
 };
 
 /** The key is read from local storage only, at call time (summon REQ-4.3). */
@@ -58,14 +68,11 @@ function boot(root: HTMLElement): void {
   const directTransport = createDirectTransport(readStoredKey);
   const transportFor = (): Transport => (readStoredKey() ? directTransport : serverTransport);
   const wake = createWakeState(apiBase);
-  // Wake a sleeping Render service once; never blocks rendering, failures are silent.
   if (!readStoredKey()) wake.start();
 
-  const autosave = createAutosave(safeStorage);
-  // Persist the open stack before the page is hidden, in case an edit is still inside the debounce.
-  const flushAutosave = () => autosave.flush();
-  addEventListener('pagehide', flushAutosave);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushAutosave(); });
+  const library = createLibrary({ storage: libraryStorage });
+  // What is open: a bundled sample (no entry yet) or a library entry. Set before any load completes.
+  let openTarget: OpenTarget = { kind: 'sample' };
 
   const toolbar = document.createElement('header');
   toolbar.className = 'chrome-toolbar';
@@ -90,18 +97,28 @@ function boot(root: HTMLElement): void {
     clear: () => { statusEl.textContent = ''; },
   };
 
-  // Highlighted message box with an Up/Down history (script-editor REQ-7).
   const messageBoxInput = new MessageBoxInput();
   const messageBox = messageBoxInput.input;
 
-  let current: PickerValue = fixtureFromSearch(location.search);
-  const picker = createStackPicker(key => { void loadKey(key); });
-  picker.setValue(current);
+  const picker = createStackPicker(choice => { void onPickerChoice(choice); });
+
+  /** Rebuild "My stacks" from the library and select the open stack. */
+  function refreshPicker(): void {
+    const records = library.list();
+    picker.setEntries(records);
+    if (openTarget.kind === 'entry') {
+      picker.setSelected(openTarget.id);
+      const id = openTarget.id;
+      deleteControl.setName(records.find(r => r.id === id)?.name ?? '');
+    }
+  }
 
   const newStackButton = document.createElement('button');
   newStackButton.type = 'button';
   newStackButton.className = 'chrome-button';
   newStackButton.textContent = 'New Stack';
+
+  const deleteControl = createDeleteControl({ onConfirm: () => { void onDeleteConfirmed(); } });
 
   const summonButton = document.createElement('button');
   summonButton.type = 'button';
@@ -118,7 +135,6 @@ function boot(root: HTMLElement): void {
   shareButton.className = 'chrome-button';
   shareButton.textContent = 'Share';
 
-  /** Toolbar controls are disabled while scripts run or a summon is pending. */
   let summoning = false;
   const updateToolbar = () => {
     const busy = runtime.isBusy || summoning;
@@ -126,11 +142,11 @@ function boot(root: HTMLElement): void {
     newStackButton.disabled = busy;
     summonButton.disabled = busy;
     shareButton.disabled = busy;
+    deleteControl.setEnabled(openTarget.kind === 'entry' && !busy);
     toggle.setDisabled(busy);
     messageBox.disabled = busy || editor.mode === 'edit';
   };
 
-  // `editor` is declared below; these callbacks only run after it exists.
   const toggle = createModeToggle(mode => {
     if (mode === 'edit') editor.enter();
     else editor.exit();
@@ -140,12 +156,7 @@ function boot(root: HTMLElement): void {
     dialogInert: () => [messageBox, toolbar],
     onBusyChange: () => updateToolbar(),
     onLoad: () => editor.reset(),
-    onFieldEdited: () => {
-      const s = runtime.currentStack;
-      if (!s) return;
-      leaveFixtureLink();
-      autosave.save(s);
-    },
+    onFieldEdited: () => persist.persist('browse-typing'),
   });
 
   const editor = new EditController({
@@ -154,24 +165,31 @@ function boot(root: HTMLElement): void {
     toolbarHost: editToolbarHost,
     onModeChange: mode => toggle.set(mode),
     agent: createAgentClient(transportFor),
-    // Autosave person-made edits (sharing REQ-2.1). Debounced; button scripts do not call this.
     onChange: () => {
       const s = runtime.currentStack;
       if (!s) return;
       stage.setTitle(s.name); // a rename in the inspector (or its undo) shows in the window title at once
-      leaveFixtureLink();
-      autosave.save(s);
+      persist.persist('authored');
     },
   });
+
+  const persist = createPersist({
+    library,
+    currentStack: () => runtime.currentStack,
+    showStatus: m => status.show(m),
+    getTarget: () => openTarget,
+    setTarget: t => { openTarget = t; updateToolbar(); },
+    onFork: () => leaveFixtureLink(),
+    onLibraryChanged: () => refreshPicker(),
+  });
+  const flushPersist = () => persist.flush();
+  addEventListener('pagehide', flushPersist);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushPersist(); });
 
   /** Bumped by every load, so a slow fixture import cannot replace a newer New Stack or Summon. */
   let loadSeq = 0;
 
-  /**
-   * `?stack=` is an explicit "open this sample" link, and it outranks the autosave on page load. Once a person has
-   * changed the stack it is theirs, so drop the link: a reload then restores their autosave instead of resetting to
-   * the pristine sample. (Playing without editing keeps the link, so a reload still starts the sample fresh.)
-   */
+  /** A person has edited a sample reached via ?stack=, so drop the link; a reload then reopens their copy. */
   function leaveFixtureLink(): void {
     const url = new URL(location.href);
     if (!url.searchParams.has('stack')) return;
@@ -179,37 +197,70 @@ function boot(root: HTMLElement): void {
     history.replaceState(null, '', url.toString());
   }
 
-  /** Load any stack exactly like a fixture: Browse mode, history cleared (REQ-1.4). Autosaves by default. */
-  async function loadStack(stack: Stack, opts: { autosave?: boolean } = {}): Promise<boolean> {
+  /** Load any stack like a fixture: Browse mode, history cleared. Flushes a pending save first. */
+  async function loadStack(stack: Stack): Promise<boolean> {
     if (runtime.isBusy) return false;
     loadSeq++;
+    persist.flush();
     editor.reset();
-    stage.setTitle(stack.name); // before the load: opening scripts (an answer dialog, say) must not delay the title
-    const ok = await runtime.load(stack);
-    if (ok && opts.autosave !== false) autosave.saveNow(stack);
-    return ok;
+    stage.setTitle(stack.name);
+    return runtime.load(stack);
   }
 
-  async function loadKey(key: FixtureName): Promise<void> {
-    if (runtime.isBusy) {
-      picker.setValue(current);
-      return;
-    }
+  /** Open a bundled sample. No library write until the first authored edit forks a copy. */
+  async function loadFixtureKey(key: FixtureName): Promise<void> {
+    if (runtime.isBusy) { refreshPicker(); picker.setSelected(key); return; }
     const seq = ++loadSeq;
     try {
       const stack = await loadFixture(key);
-      if (seq !== loadSeq) return; // superseded while the fixture was importing
-      if (!(await loadStack(stack))) {
-        picker.setValue(current);
-        return;
-      }
-      current = key;
-      picker.setValue(key);
+      if (seq !== loadSeq) return;
+      if (!(await loadStack(stack))) { refreshPicker(); return; }
+      openTarget = { kind: 'sample' };
+      library.setLastOpened({ kind: 'fixture', key });
+      updateToolbar();
+      refreshPicker();
+      picker.setSelected(key);
       history.replaceState(null, '', urlWithFixture(location.href, key));
     } catch (e) {
       console.error(e);
-      picker.setValue(current);
+      refreshPicker();
       status.show(`Could not load stack: ${messageOf(e)}`);
+    }
+  }
+
+  /** Open an existing library entry by id. */
+  async function openEntry(id: string): Promise<void> {
+    if (runtime.isBusy) { refreshPicker(); return; }
+    const entry = library.open(id);
+    if (!entry) { status.show('That stack could not be opened; opening the sample stack.'); void loadFixtureKey(DEFAULT_FIXTURE); return; }
+    if (!(await loadStack(entry.stack))) { refreshPicker(); return; }
+    openTarget = { kind: 'entry', id };
+    library.setLastOpened({ kind: 'entry', id });
+    leaveFixtureLink();
+    updateToolbar();
+    refreshPicker();
+  }
+
+  function onPickerChoice(choice: PickerChoice): Promise<void> {
+    return choice.kind === 'fixture' ? loadFixtureKey(choice.key) : openEntry(choice.id);
+  }
+
+  /** Create a library entry from a stack and open it in Edit mode (Summon, Import, New Stack). */
+  async function createEntryInEdit(stack: Stack, enterEdit: boolean): Promise<void> {
+    if (!(await loadStack(stack))) throw new Error('A script is still running. Try again when it finishes.');
+    const r = library.create(stack, stack.name);
+    if (!r.ok) {
+      status.show('Your library is full; that stack was not saved.');
+      openTarget = { kind: 'sample' }; // nothing persisted; treat as unsaved
+    } else {
+      openTarget = { kind: 'entry', id: r.entry.id };
+      library.setLastOpened({ kind: 'entry', id: r.entry.id });
+    }
+    leaveFixtureLink();
+    updateToolbar();
+    refreshPicker();
+    if (enterEdit && !editor.enter()) {
+      status.show('The stack is loaded. Switch to Edit when its opening scripts finish.');
     }
   }
 
@@ -223,30 +274,21 @@ function boot(root: HTMLElement): void {
         status.show(`Could not create stack: ${messageOf(e)}`);
         return;
       }
-      if (!(await loadStack(stack))) return;
-      current = UNTITLED;
-      picker.showUntitled();
-      leaveFixtureLink();
+      await createEntryInEdit(stack, true);
     })();
   });
 
-  /** A summoned, imported or shared stack loads like New Stack, then opens in Edit mode under its own name. */
-  async function loadNamedInEdit(stack: Stack): Promise<void> {
-    if (!(await loadStack(stack))) throw new Error('A script is still running. Try again when it finishes.');
-    current = CUSTOM;
-    picker.showCustom(stack.name);
-    leaveFixtureLink();
-    if (!editor.enter()) status.show('The stack is loaded. Switch to Edit when its opening scripts finish.');
+  async function onDeleteConfirmed(): Promise<void> {
+    if (openTarget.kind !== 'entry') return;
+    library.delete(openTarget.id);
+    await loadFixtureKey(DEFAULT_FIXTURE);
   }
 
   const summonDialog = new SummonDialog({
     transport: transportFor,
     wake,
-    onLoaded: loadNamedInEdit,
-    onBusyChange: pending => {
-      summoning = pending;
-      updateToolbar();
-    },
+    onLoaded: stack => createEntryInEdit(stack, true),
+    onBusyChange: pending => { summoning = pending; updateToolbar(); },
   });
   const settingsDialog = new SettingsDialog({
     storage: keyStorage,
@@ -258,11 +300,9 @@ function boot(root: HTMLElement): void {
       if (!s) throw new Error('No stack is loaded');
       return s;
     },
-    onImported: loadNamedInEdit,
+    onImported: stack => createEntryInEdit(stack, true),
   });
-  summonButton.addEventListener('click', () => {
-    if (!runtime.isBusy) summonDialog.open();
-  });
+  summonButton.addEventListener('click', () => { if (!runtime.isBusy) summonDialog.open(); });
   settingsButton.addEventListener('click', () => settingsDialog.open());
   shareButton.addEventListener('click', () => {
     if (!runtime.isBusy && runtime.currentStack) shareDialog.open();
@@ -273,67 +313,54 @@ function boot(root: HTMLElement): void {
     e.preventDefault();
     const line = messageBox.value;
     messageBoxInput.submitted(line);
-    // The input is disabled while busy, which drops focus; restore it with the text selected.
     void runtime.runMessageBox(line).then(() => {
-      // The message box is a person action, so persist any change it made (sharing REQ-2.1).
-      const s = runtime.currentStack;
-      if (s) {
-        leaveFixtureLink();
-        autosave.save(s);
-      }
+      persist.persist('authored'); // the message box is a person action (may mutate the stack)
       messageBox.focus();
       messageBox.select();
     });
   });
 
-  /** Open a stack shared in the URL fragment: Browse, named, autosave OFF so the visitor's own save is kept. */
+  /** Open a stack shared in the URL fragment: it becomes a library entry (single load path). */
   async function openShared(encoded: string): Promise<void> {
     let stack: Stack;
     try {
       stack = await decodeStack(encoded);
     } catch {
       status.show('That shared link could not be opened; opening the sample stack.');
-      void loadKey(DEFAULT_FIXTURE);
+      void loadFixtureKey(DEFAULT_FIXTURE);
       return;
     }
-    if (!(await loadStack(stack, { autosave: false }))) return;
-    current = CUSTOM;
-    picker.showCustom(stack.name);
-    // Drop the fragment (and any query) so a reload falls through to the visitor's own autosave.
+    // Clear the fragment first so a reload falls through to the last-open entry (this new one).
     history.replaceState(null, '', `${location.origin}${location.pathname}`);
+    await createEntryInEdit(stack, false);
   }
 
-  toolbar.append(title, picker.el, newStackButton, summonButton, shareButton, settingsButton, toggle.el);
+  toolbar.append(title, picker.el, newStackButton, deleteControl.button, summonButton, shareButton, settingsButton, toggle.el);
   root.replaceChildren(toolbar, editToolbarHost, workspace, statusEl, messageBoxInput.el);
   stage.observe();
+  refreshPicker();
 
-  // Initial load (sharing REQ-2.2): share fragment, then ?stack=, then autosave, then the quiz.
-  const initial = chooseInitialLoad(location, safeStorage);
-  if (initial.corruptAutosave) status.show('Your saved stack could not be read; opening the sample stack.');
+  // Initial load (REQ-5.1): share fragment, then ?stack=, then the last-open stack, then the quiz.
+  const initial = chooseInitialLoad(location, { storage: libraryStorage });
+  if (initial.corruptAutosave || initial.corruptIndex) {
+    status.show('Your saved stack could not be read; opening the sample stack.');
+  }
   switch (initial.load.source) {
     case 'share':
       void openShared(initial.load.encoded);
       break;
     case 'fixture':
-      void loadKey(initial.load.key);
+      void loadFixtureKey(initial.load.key);
       break;
-    case 'autosave': {
-      const saved = initial.load.stack;
-      void (async () => {
-        if (await loadStack(saved, { autosave: false })) {
-          current = CUSTOM;
-          picker.showCustom(saved.name);
-        }
-      })();
+    case 'library':
+      void openEntry(initial.load.entry.id);
       break;
-    }
     case 'default':
-      void loadKey(DEFAULT_FIXTURE);
+      void loadFixtureKey(DEFAULT_FIXTURE);
       break;
   }
 
-  // A share link pasted into an already-open tab only changes the fragment (a same-document
-  // navigation), so boot() does not re-run; handle it here. Opening in a fresh tab uses the load above.
+  // A share link pasted into an already-open tab only changes the fragment; handle it here.
   addEventListener('hashchange', () => {
     const encoded = new URLSearchParams(location.hash.replace(/^#/, '')).get('s');
     if (encoded && encoded.trim() !== '' && !runtime.isBusy) void openShared(encoded);

@@ -110,6 +110,7 @@ but no spec task for them is created until the core is done. Order of value:
    the person's own stacks in the stack picker, backed by localStorage, with Save, Open and Delete. Today the app keeps
    exactly one autosaved stack, so summoning a second one silently replaces the first; the library lets the demo summon
    several stacks and switch between them. One storage module under `src/share/`, picker changes, tests; no server.
+   Specified and implemented as spec `stack-library` (2026-11-04); it supersedes the single-value autosave.
 0b. **Edit background** (app feature; decided 2026-11-04, second after the library): an "Edit background" toggle in
    the Card menu that swaps which layer the selection, tools and inspector work on, as HyperCard's Edit Background
    mode did. Today background objects are drawn but not selectable (edit-mode REQ-2.1), and Summon puts shared

@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Task-done chime",
+      "trigger": "Stop",
+      "description": "Plays a short rising three-note chime when the agent finishes a turn.",
+      "action": {
+        "type": "command",
+        "command": "powershell -NoProfile -Command \"[console]::beep(880,200); [console]::beep(1174,200); [console]::beep(1568,350)\""
+      }
+    }
+  ]
+}

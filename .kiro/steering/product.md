@@ -50,7 +50,9 @@ The whole stack serializes to one JSON document. **Round-trip must be lossless.*
 
 ## Persistence and sharing
 
-- Autosave the open stack to `localStorage`.
+- Keep the person's stacks in a `localStorage` library: the open stack and every stack they have summoned,
+  imported, started, or forked from a sample, switchable from the picker (spec `stack-library`). There is no Save
+  command — a stack that is open is saved.
 - Export and import `.necrocard.json`.
 - Share by URL: compressed stack in the fragment for small stacks; serverless blob store with a short id for larger ones.
 - For the hackathon, sharing is by compressed URL fragment only (no blob store); a length warning and Export cover large stacks, and `src/share/` imports only `src/model/`.

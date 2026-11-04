@@ -1,4 +1,5 @@
 import type { FixtureName } from '../../model/fixtures.js';
+import type { LibraryRecord } from '../../share/library.js';
 
 /** Bundled stacks in picker order. Names match each fixture's `name` (REQ-6). */
 export const FIXTURES: readonly { key: FixtureName; name: string }[] = [
@@ -26,71 +27,78 @@ export function urlWithFixture(href: string, key: FixtureName): string {
   return url.toString();
 }
 
+/** What the person chose in the picker: a bundled sample or a library entry. */
+export type PickerChoice =
+  | { kind: 'fixture'; key: FixtureName }
+  | { kind: 'entry'; id: string };
+
 export interface StackPicker {
   el: HTMLElement;
   select: HTMLSelectElement;
-  setValue(key: PickerValue): void;
+  /** Rebuild the "My stacks" group from library records (newest-first as given). Keeps "Samples" fixed. */
+  setEntries(records: LibraryRecord[]): void;
+  /** Select a fixture key or a library entry id. */
+  setSelected(value: FixtureName | string): void;
   setDisabled(disabled: boolean): void;
-  /** Add (if missing) and select an "Untitled" entry for a new stack (edit-mode REQ-1.5). */
-  showUntitled(): void;
-  /** Add or rename, and select, one entry showing a summoned stack's name (summon REQ-8.3). */
-  showCustom(name: string): void;
 }
 
-/** Picker value for a stack made with New Stack. */
-export const UNTITLED = 'untitled';
-/** Picker value for a summoned stack. */
-export const CUSTOM = 'custom';
+const SAMPLES_LABEL = 'Samples';
+const MY_STACKS_LABEL = 'My stacks';
 
-export type PickerValue = FixtureName | typeof UNTITLED | typeof CUSTOM;
-
-/** Label for the custom entry; a name equal to a bundled sample's is marked as the person's copy. */
-function customLabel(name: string): string {
-  if (name.trim() === '') return 'Summoned stack';
-  return FIXTURES.some(f => f.name === name) ? `${name} (your copy)` : name;
-}
-
-/** A labelled <select> of the bundled stacks. `onChange` receives the chosen fixture key. */
-export function createStackPicker(onChange: (key: FixtureName) => void): StackPicker {
+/**
+ * A labelled <select> with a fixed "Samples" group and a rebuildable "My stacks" group. `onChoose` fires on a
+ * person change with the chosen sample or entry. Entry option values are library ids; sample values are fixture
+ * keys (disjoint: ids are 10-char random strings, keys are the three fixture names).
+ */
+export function createStackPicker(onChoose: (choice: PickerChoice) => void): StackPicker {
   const label = document.createElement('label');
   label.className = 'stack-picker';
   label.append('Stack ');
   const select = document.createElement('select');
   select.id = 'stack-picker';
+
+  const samples = document.createElement('optgroup');
+  samples.label = SAMPLES_LABEL;
   for (const f of FIXTURES) {
     const option = document.createElement('option');
     option.value = f.key;
     option.textContent = f.name;
-    select.append(option);
+    samples.append(option);
   }
-  const extra = (value: string) => select.querySelector<HTMLOptionElement>(`option[value="${value}"]`);
-  const addExtra = (value: string, text: string) => {
-    const option = extra(value) ?? document.createElement('option');
-    option.value = value;
-    option.textContent = text;
-    if (!option.parentNode) select.append(option);
+  select.append(samples);
+
+  // The "My stacks" group is created on demand and removed when empty.
+  let myStacks: HTMLOptGroupElement | null = null;
+
+  const setEntries = (records: LibraryRecord[]): void => {
+    myStacks?.remove();
+    myStacks = null;
+    if (records.length === 0) return;
+    const group = document.createElement('optgroup');
+    group.label = MY_STACKS_LABEL;
+    for (const r of records) {
+      const option = document.createElement('option');
+      option.value = r.id;
+      option.textContent = r.name;
+      group.append(option);
+    }
+    select.append(group);
+    myStacks = group;
   };
-  // Untitled and the summoned entry are transient (no persistence until spec `sharing`):
-  // choosing anything else removes them.
-  const setValue = (key: PickerValue) => {
-    if (key === UNTITLED && !extra(UNTITLED)) addExtra(UNTITLED, 'Untitled');
-    if (key !== UNTITLED) extra(UNTITLED)?.remove();
-    if (key !== CUSTOM) extra(CUSTOM)?.remove();
-    select.value = key;
-  };
+
+  const setSelected = (value: string): void => { select.value = value; };
+
   select.addEventListener('change', () => {
-    if (isFixture(select.value)) onChange(select.value);
+    const value = select.value;
+    onChoose(isFixture(value) ? { kind: 'fixture', key: value } : { kind: 'entry', id: value });
   });
+
   label.append(select);
   return {
     el: label,
     select,
-    setValue,
+    setEntries,
+    setSelected,
     setDisabled: disabled => { select.disabled = disabled; },
-    showUntitled: () => setValue(UNTITLED),
-    showCustom: name => {
-      addExtra(CUSTOM, customLabel(name));
-      setValue(CUSTOM);
-    },
   };
 }

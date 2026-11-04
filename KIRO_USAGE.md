@@ -706,3 +706,52 @@ a pipeline test shows the retry carrying exactly that one error and the correcte
 decision on its own and said so: a mouseUp on a card is valid NecroTalk (an unhandled click passes up), so the
 reverse rule is prompt guidance only, not an error. The property tests' generator now keeps card-message scripts out
 of object slots. 997 unit tests.
+
+
+## 2026-11-04 - Spec 9: stack-library (requirements, design, tasks, implementation)
+Surface: CLI (Auto)
+Features: spec, steering, MCP (Playwright)
+What I asked for: a named list of the person's stacks in the picker, backed by localStorage, superseding the single
+autosave: samples stay as a fixed group, every non-sample stack (New Stack, Summon, Import, share, or the first edit
+of a sample) becomes a "My stacks" entry, switching is lossless, reloads reopen the last-open stack, Delete falls
+back to the quiz, rename is via the inspector, and a legacy autosave migrates once. A pure module under src/share/,
+picker and main.ts changes, chrome only; no server, no new deps, and src/interp, src/model, fixtures, src/summon and
+server/ untouched. The spec was written requirements-first with two review rounds before any code.
+What Kiro did: wrote src/share/library.ts (index key plus one body key per entry, a version field, entry ids
+independent of stack.id, a numeric collision suffix, a last-open pointer that tracks samples and entries, and a
+one-time legacy migration), moved chooseInitialLoad into it and removed autosave.ts. The debounce/fork/save logic
+went into a unit-testable src/ui/browse/persist.ts (the reviewer's note, so main.ts would not grow unbounded and
+src/share stayed model-only); the Delete button and its confirm into src/ui/browse/libraryControls.ts; the picker
+became two <optgroup>s with a setEntries/select API and the old customLabel/transient-entry logic deleted. main.ts
+holds an openTarget (sample or entry) and routes the three person-action signals through persist. Two review notes
+were applied first: the save name re-derivation compares against a stored stackName field rather than reading the
+old body, and the persist logic lives outside main.ts.
+Review and what I decided: two things I caught and fixed mid-run. The import e2e assumed an imported quiz would show
+"(your copy)"; it does not, because that suffix comes only from the sample fork, and a library entry named "The
+Haunted Quiz" sits in "My stacks" with no collision against the sample in "Samples" — so the assertion was wrong,
+not the code. And the MCP run surfaced a real bug the unit tests had missed: the Delete confirm read Delete "" because
+main.ts never told the control the open entry's name; I wired setName into the picker rebuild and added an e2e
+assertion that the dialog names the stack, so it cannot regress. Two files sit over the ~300-line guideline:
+main.ts at 371 (it was 326 before this spec; the separable logic already moved to persist.ts and libraryControls.ts,
+and the rest is cohesive top-level wiring I judged riskier to split than to leave) and library.ts at 307 (one
+cohesive module). Flagged both rather than forcing a split. Results: typecheck, lint, test, build, server:build and
+e2e all green; 1017 unit tests in 70 files; 27 e2e tests. The MCP run showed both picker groups, the toolbar fitting
+the extra Delete button at the 2x width, and the named confirm; its only console error was the expected /api/health
+502, and it cleared localStorage at the end. Screenshots in docs/screenshots/library-picker.png and
+library-delete-confirm.png.
+
+## 2026-11-04 — Spec 9 closed: what the two review rounds changed
+Surface: CLI (Auto)
+Features: spec
+The requirements came back complete, and the review still found three conflicts that would have shipped
+otherwise. The load order reopened the last library entry whenever the URL was bare, so opening a sample from the
+picker and reloading would have brought back someone else's stack: the last-open pointer now tracks samples as
+well as entries. Typing an answer into a quiz field counted as an edit, so every play of a sample would have forked
+a "(your copy)" entry: only Edit-mode and message-box changes fork a sample now, a deliberate narrowing of the
+sharing spec's save signal. And one criterion said every load writes immediately, which contradicted the rule
+that an unedited sample creates nothing. The design round removed a feature: a library Rename dialog would have
+given a stack a second name that drifted from the one the inspector edits and the title bar shows, so the entry
+name follows stack.name and the inspector is the rename. The design also had to be told that main.ts wraps
+localStorage in a wrapper that swallows errors, so a quota failure would never have reached the library.
+Verification after the run: 1017 unit tests in 70 files, protected directories untouched, both screenshots
+checked. Two files sit just over the 300-line guideline; left as Kiro flagged them.

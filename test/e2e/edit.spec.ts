@@ -86,7 +86,6 @@ test('New Stack: add a button that renames itself, click it in Browse', async ({
   await expect(surface(page)).toHaveAttribute('data-busy', 'false');
 
   await page.getByRole('button', { name: 'New Stack', exact: true }).click();
-  await expect(page.getByRole('combobox', { name: 'Stack', exact: true })).toHaveValue('untitled');
   await expect(page.getByRole('combobox', { name: 'Stack', exact: true }).locator('option:checked')).toHaveText('Untitled');
   await expect(surface(page)).toHaveAttribute('data-card-name', 'Card 1');
   await expect(page).not.toHaveURL(/stack=/);
