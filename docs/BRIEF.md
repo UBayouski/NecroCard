@@ -106,6 +106,10 @@ Freeze this list in the interpreter spec. Anything not listed is out of scope fo
 These are small enough to add in week 3 or 4 and each adds real value. The interpreter design must not block them,
 but no spec task for them is created until the core is done. Order of value:
 
+0. **Stack library** (an app feature, not a language one; decided 2026-11-04, first to implement): a named list of
+   the person's own stacks in the stack picker, backed by localStorage, with Save, Open and Delete. Today the app keeps
+   exactly one autosaved stack, so summoning a second one silently replaces the first; the library lets the demo summon
+   several stacks and switch between them. One storage module under `src/share/`, picker changes, tests; no server.
 1. `item N of <expr>` chunk with comma delimiter (read-only). Enables simple lists in fields. Also `the number of items of`.
 2. `find "text"`: jump to the first card after the current one whose fields contain the text, highlight the field.
    No `find whole`, no `find in field`.
@@ -199,7 +203,9 @@ chunks as put targets, number formatting.
 6. `summon`: prompt, schema validation, retry, serverless function, caps, BYO key.
 7. `sharing`: localStorage autosave, export/import, URL share, blob store.
 8. `retro-skin`: 1-bit styling, fonts, patterns, transitions.
-9. `necrotalk-phase2` (only if specs 1 to 7 are done by Nov 23): `item` chunks, `find`, one-voice `play`, `send`.
+9. `stack-library` (phase 2, first; added 2026-11-04): a named list of the person's stacks in the picker, backed by
+   localStorage, with Save, Open and Delete.
+10. `necrotalk-phase2` (only if time remains by Nov 23): `item` chunks, `find`, one-voice `play`, `send`.
 
 ## 13. Kiro plan (what to use and why)
 

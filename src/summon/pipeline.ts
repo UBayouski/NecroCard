@@ -7,6 +7,7 @@ import { validateStack, ValidationError } from '../model/validate.js';
 import { LIMITS } from './contract.js';
 import { extractJsonObject } from './extract.js';
 import { checkIntegrity, scriptsOf } from './integrity.js';
+import { repairIds } from './repair.js';
 import type { Transport, TransportReply } from './transport.js';
 
 export type SummonProgress = 'summoning' | 'validating' | 'retrying';
@@ -38,9 +39,56 @@ function describeSchemaError(e: ErrorObject): string {
   return `Schema: ${path} ${e.message ?? 'is invalid'}${typeof extra === 'string' ? ` ("${extra}")` : ''}`;
 }
 
-function schemaErrors(e: unknown): string[] {
+const BASE_PROPS = ['id', 'name', 'rect', 'visible', 'script'];
+/** Properties each object type allows, and requires, beyond the base set (mirrors stack.schema.json). */
+const BRANCH: Record<string, { allowed: string[]; required: string[]; styles?: string[] }> = {
+  button: { allowed: ['type', 'style', 'label', 'autoHilite'], required: ['type', 'style', 'label', 'autoHilite'], styles: ['rect', 'roundRect', 'transparent'] },
+  field: { allowed: ['type', 'text', 'lockText', 'style'], required: ['type', 'text', 'lockText', 'style'], styles: ['rect', 'scrolling', 'transparent'] },
+  image: { allowed: ['type', 'src'], required: ['type', 'src'] },
+};
+
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+function valueAt(root: unknown, pointer: string): unknown {
+  let cur = root;
+  for (const part of pointer.split('/').slice(1)) {
+    if (Array.isArray(cur)) cur = cur[Number(part)];
+    else if (isRecord(cur)) cur = cur[part];
+    else return undefined;
+  }
+  return cur;
+}
+
+/**
+ * The CardObject schema is a oneOf over button, field and image, so one fault in one object makes ajv report
+ * the failures of all three branches plus the oneOf itself (about ten lines). When the object names its own
+ * type, keep only that branch's errors: drop the other branches' `type` constant, missing-property and
+ * unexpected-property errors, and the oneOf summary. A bad id then reports as one line.
+ */
+function inChosenBranch(e: ErrorObject, root: unknown): boolean {
+  const m = /^(.*\/objects\/\d+)(\/.*)?$/.exec(e.instancePath);
+  if (!m) return true;
+  const obj = valueAt(root, m[1]);
+  const branch = isRecord(obj) && typeof obj.type === 'string' ? BRANCH[obj.type] : undefined;
+  if (!branch) return true;
+  const params = e.params as Record<string, unknown>;
+  if (e.instancePath === m[1]) {
+    if (e.keyword === 'oneOf') return false;
+    if (e.keyword === 'required') return BASE_PROPS.includes(String(params.missingProperty)) || branch.required.includes(String(params.missingProperty));
+    if (e.keyword === 'unevaluatedProperties') {
+      const prop = String(params.unevaluatedProperty);
+      return !BASE_PROPS.includes(prop) && !branch.allowed.includes(prop);
+    }
+  }
+  if (e.instancePath === `${m[1]}/type` && e.keyword === 'const') return false;
+  // Another branch's style list rejects a style this type allows (a roundRect button fails the field branch).
+  if (e.instancePath === `${m[1]}/style` && e.keyword === 'enum' && branch.styles?.includes(String((obj as Record<string, unknown>).style))) return false;
+  return true;
+}
+
+export function schemaErrors(e: unknown, root?: unknown): string[] {
   if (!(e instanceof ValidationError)) return [`Schema: ${messageOf(e)}`];
-  const lines = [...new Set(e.errors.map(describeSchemaError))];
+  const lines = [...new Set(e.errors.filter(err => inChosenBranch(err, root)).map(describeSchemaError))];
   if (lines.length === 0) return ['Schema: the stack does not match the schema'];
   return lines.length > MAX_SCHEMA_ERRORS
     ? [...lines.slice(0, MAX_SCHEMA_ERRORS), `Schema: …and ${lines.length - MAX_SCHEMA_ERRORS} more`]
@@ -51,11 +99,12 @@ function schemaErrors(e: unknown): string[] {
 export function checkReply(text: string): CheckResult {
   const extracted = extractJsonObject(text);
   if ('error' in extracted) return { errors: [extracted.error] };
+  const repaired = repairIds(extracted.value);
   let stack: Stack;
   try {
-    stack = validateStack(extracted.value);
+    stack = validateStack(repaired);
   } catch (e) {
-    return { errors: schemaErrors(e) };
+    return { errors: schemaErrors(e, repaired) };
   }
   const errors = checkIntegrity(stack);
   for (const site of scriptsOf(stack)) {

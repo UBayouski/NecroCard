@@ -9,7 +9,8 @@ import type { CardObject, Stack } from '../model/types.js';
 import { LIMITS, type SummonRequest } from './contract.js';
 import { GRAMMAR_EXAMPLES } from './grammar.js';
 import { scriptsOf } from './integrity.js';
-import { checkReply, MAX_SCHEMA_ERRORS, retryErrors, SummonError, summonStack, type SummonProgress } from './pipeline.js';
+import { checkReply, MAX_SCHEMA_ERRORS, retryErrors, schemaErrors, SummonError, summonStack, type SummonProgress } from './pipeline.js';
+import { validateStack, ValidationError } from '../model/validate.js';
 import { TransportError, type Transport, type TransportReply } from './transport.js';
 
 const FIXTURES = [quiz, adventure, flashcards] as unknown as Stack[];
@@ -273,9 +274,50 @@ describe('summonStack examples', () => {
     expect(t2.requests).toHaveLength(1);
   });
 
+  it('a first reply whose only faults are bad ids loads without a retry', async () => {
+    const bad = good();
+    bad.id = 'stkHalloween';                 // too long
+    bad.cards[0].id = 'cdWord1___';          // padded
+    bad.cards[0].objects[0].id = 'x';        // far too short
+    bad.cards[1].id = bad.cards[0].objects[1].id; // a repeat
+    const { transport, requests } = fakeTransport([JSON.stringify(bad)]);
+    const stack = await summonStack('x', transport);
+    expect(requests).toHaveLength(1);
+    expect(stack.cards).toHaveLength(bad.cards.length);
+    expect(stack.cards.map(c => c.backgroundId)).toEqual(bad.cards.map(c => c.backgroundId));
+  });
+
+  it('an object whose only fault is its id reports one schema line, not the oneOf cascade', () => {
+    for (const type of ['button', 'field'] as const) {
+      const bad = good();
+      const target = bad.cards.flatMap(c => c.objects).find(o => o.type === type)!;
+      target.id = 'stkHalloween'; // too long, and the only fault
+      let thrown: unknown;
+      try { validateStack(bad); } catch (e) { thrown = e; }
+      expect(thrown).toBeInstanceOf(ValidationError);
+      const lines = schemaErrors(thrown, bad);
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toMatch(/^Schema: \/cards\/\d+\/objects\/\d+\/id must match pattern/);
+    }
+  });
+
+  it('an object with another single fault also reports one schema line', () => {
+    const bad = good() as unknown as { cards: { objects: { id: unknown }[] }[] };
+    // A fault repairIds does not fix: an id given as an object is replaced, so use a different single fault.
+    const target = bad.cards.find(c => c.objects.length > 0)!.objects[0] as Record<string, unknown>;
+    target.name = 7;
+    const result = checkReply(JSON.stringify(bad));
+    expect('errors' in result).toBe(true);
+    if (!('errors' in result)) return;
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toMatch(/\/objects\/0\/name must be string/);
+  });
+
   it('caps schema errors, error lines, error count and the previous reply', async () => {
     const bad = good();
-    for (const card of bad.cards) for (const o of card.objects) (o as unknown as Record<string, unknown>).rect = 'x';
+    for (const card of bad.cards) {
+      for (const o of card.objects) Object.assign(o, { rect: 'x', name: 7 }); // two faults per object, one line each
+    }
     const result = checkReply(JSON.stringify(bad));
     expect('errors' in result && result.errors.length).toBe(MAX_SCHEMA_ERRORS + 1);
 

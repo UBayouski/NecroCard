@@ -355,14 +355,9 @@ restores a copy by design so history never aliases the working copy; another exp
 new button's mouseDown, but message passing correctly hands it up. Typecheck failed once on Node's Buffer in a
 test; it fixed the test rather than add @types/node. The MCP run drove the full flow: Edit, Add button, script in
 the inspector, Browse, click, card Title to Q1. Two screenshots, copies committed in docs/screenshots/.
-What changed: Two incidents during the MCP run, both logged by Kiro. First, the undo history showed eight moves and
-resizes it had not made; the MCP browser is a visible window and a human was using it between calls (I had
-suggested trying edit mode at that address). Kiro undid them, saw the quiz return exactly to the fixture, redid
-them, and treated it as a live check of the byte-exact undo requirement before reloading. Second, it sent dependent
-MCP steps in parallel, "Add button" ran before edit mode was ready, and a screenshot captured the wrong state; it
-redid the flow one step at a time, checking state before each screenshot. One visual note carried to retro-skin:
-the dashed selection outline sits on top of a roundRect button's 2 px border, so only the handles show selection.
-Interpreter and model untouched, no new dependencies.
+What changed: The two MCP incidents (the unexplained undo history, which was me using the visible MCP window after
+suggesting edit mode at that address, and the dependent steps sent in parallel) and the selection-outline note are
+in the Task 11 entry above and are not repeated here. Interpreter and model untouched, no new dependencies.
 
 ## 2026-11-03 — Spec 5: script-editor (requirements, design, tasks)
 Surface: CLI (Auto)
@@ -429,16 +424,11 @@ Surface: CLI (Auto)
 Features: spec, mcp, hook
 What I asked for: Tasks 1 to 6, stop, then a human check of the two things Kiro said happy-dom could not prove
 (mirror alignment with the transparent textarea, native undo after the indent shortcut), then the e2e and MCP tasks.
-What Kiro did: 631 Vitest tests in 44 files and 9 e2e tests, all green with typecheck, lint and build. The human
-check in Chrome confirmed alignment and undo, and found two things Kiro had not: selected text vanished because the
-textarea's opaque selection highlight sat above the mirror that carries the coloured text, and Ctrl+Z after Ctrl+]
-selected the whole line because the indent replaced the entire line range in one insertText. Kiro fixed both (a
-translucent selection colour, and single-line indents that insert only the two spaces so native undo leaves a
-caret) and, since happy-dom cannot run native undo, added two e2e tests in real Chromium that would have failed
-before the fixes. The MCP run then drove the broken-handler flow one dependent action per call, screenshotted the
-inline error and the Expand dialog, and found and fixed one more thing: the dialog title read "Script: Script" and
-now names the owner. It also noted a second NecroCard tab it had not opened in the MCP browser and worked only in
-its own.
+What Kiro did: 631 Vitest tests in 44 files and 9 e2e tests, all green with typecheck, lint and build. The two
+Chrome findings, their fixes, the real-browser e2e tests and the MCP run are in the entry above. New here: the human
+check confirmed the two things Kiro had said happy-dom could not prove (mirror alignment under the transparent
+textarea, native undo after the indent shortcut) before it found the two bugs, and Kiro noted a second NecroCard tab
+it had not opened in the MCP browser and worked only in its own.
 What changed: The pattern for this project is now settled: Kiro proves what it can in happy-dom, says plainly what
 it cannot, a human checks that in a real browser, and the fixes come back with real-browser e2e tests so the gap is
 closed for good. Caret position after undo lands at the line start, which is inherent to using the browser's own
@@ -581,12 +571,8 @@ What I asked for: after Kiro's own entry above, the autosave gate (card navigati
 a change), Task 6 with both servers up so the page load had a clean console, and Task 7.
 What Kiro did: a revision counter on the undo history that moves only when a command is applied, undone or redone,
 so the editor's change signal fires for content and not for navigation, with a test that counts calls through add,
-same-place move, real move, next, prev and undo. The e2e suite found a real bug: a share link opened in a tab
-already at the same path is a same-document navigation, so the boot code never re-ran. Kiro suspected its test
-first, reproduced both cases in the MCP browser, and fixed the app with a hashchange listener rather than bending the
-test. The same MCP run corrected two wrong assumptions in its tests (a button's accessible name is its label; a
-Playwright download is read from its path) and showed a 1348-character share link for the quiz opening in a second
-tab on the Title card with the fragment already cleared.
+same-place move, real move, next, prev and undo. The same-document share-link bug, the two corrected test
+assumptions and the MCP run are in the entry above.
 What changed: My checks matched: 909 unit tests in 64 files, 14 e2e tests, both stable on rerun, protected
 directories untouched, no new dependency. The screenshot also confirms the round rect button fix made between the
 specs: a 1 px outline with a 2 px right and bottom shadow and clean corners, in place of the bevel whose white and
@@ -614,7 +600,7 @@ and DotGothic16 ships as its Latin subset, since the full file covers Japanese a
 look in Chrome is scheduled after the chrome restyle and before the e2e, as with the script editor, because font
 rendering is exactly what happy-dom cannot see.
 
-## 2026-11-04 - Spec 8: retro-skin (Tasks 1-8, implementation and verification)
+## 2026-11-04 — Spec 8: retro-skin executed (tasks 1 to 8), with a human check between tasks 4 and 5
 Surface: CLI (Auto)
 Features: spec, steering, MCP (Playwright), hooks
 What I asked for: Tasks 1-4 first (patterns, fonts, card restyle, window frame, chrome), then a stop for a human look
@@ -653,7 +639,8 @@ guideline from this spec's additions. The subpixel fringes and the title-bar hei
 The one MCP console error, 502 on /api/health, is expected because only the dev server was running.
 
 ## 2026-11-04 — Spec 8 closed: human check and review notes
-Surface: Claude Code (reviewer), Chrome on a 150 % display
+Surface: CLI (Auto); the human check in Chrome on a 150 % display
+Features: spec, mcp
 What the human check covered, after Tasks 1 to 4: four screens in real Chrome, where the card rendered at 3x (the
 window was wide enough). Title card, Q1 in Browse, Edit mode with the inspector open, and a selected button with its
 three-line script. The editor region was cropped and enlarged 4x to look for the ghosting that a mirror and textarea
@@ -671,3 +658,22 @@ reload later. Lesson for later MCP runs: an action that edits a stack ends by re
 Independent checks: the three font licenses were read at source in google/fonts (OFL 1.1, no Reserved Font Name
 declared); typecheck, lint, 972 unit tests, build and server:build rerun green here; the six protected areas and
 package.json dependencies unchanged; no proprietary typeface name under src/. Spec 8 closes the eight planned specs.
+
+## 2026-11-04 — Two fixes between specs: summon id repair and the picker's "your copy" label
+Surface: CLI (Auto)
+Features: pbt, vibe (no spec; two prompts written from a real failure and a real screenshot)
+What happened: the first real Summon on the live site, "Flashcards for five Halloween words: show the word, click
+to reveal the meaning, Next and Prev buttons", failed both attempts with fifty schema lines. Reproduced locally
+against the same model: the stack was good (five cards, reveal button, hidden meaning, Prev/Next and a counter on the
+background, every script parsed) and the only faults were ids such as `stkHalloween` and `fdWord1___`, which miss the
+8 to 10 character pattern. The retry repeated them because each bad id produced ten cascading oneOf lines.
+What Kiro did: `src/summon/repair.ts` rewrites any invalid or duplicate id to a stable hashed one before validation
+and carries `backgroundId` references along; schema errors keep only the branch that matches the object's type; the
+prompt says ids are never words. Four fast-check properties, idempotence among them, and a pipeline test that a reply
+whose only faults are bad ids loads on the first request. Kiro found and fixed a leak in its own filter (a roundRect
+button still drew a second line from the field branch's style list).
+Review: the saved failing reply was run through the compiled new pipeline and loaded on the first attempt with the two
+ids rewritten and all five cards pointing at the renamed background. 989 unit tests in 68 files, 23 e2e.
+The second fix came from a screenshot: an edited sample restored from autosave appeared in the stack picker under the
+same title as the pristine sample. The custom entry is now labelled "<name> (your copy)" when the name collides with
+a bundled stack, with a unit test and two e2e assertions.

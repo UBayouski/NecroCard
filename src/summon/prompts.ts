@@ -61,6 +61,7 @@ ${SCHEMA_TEXT}
 
 Rules the schema does not check, which are required too:
 - Every id (stack, backgrounds, cards, objects) is 8 to 10 characters from A-Z a-z 0-9 _ - and unique in the stack.
+  Ids look like the examples: a two-letter prefix and six random letters or digits, never a word and never padded.
 - Every card's backgroundId is the id of a background in this stack.
 - At least one background and at least one card.
 - Cards are 512 x 342 pixels; keep every rect inside the card (x + w <= 512, y + h <= 342). Integers only.
