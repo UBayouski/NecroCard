@@ -1,6 +1,7 @@
 // Public module of src/summon/: the agent boundary the UI depends on (script-editor REQ-5.1).
-// It imports nothing. src/ui/ may import it; src/summon/ never imports src/ui/ (structure.md).
-// Spec `summon` adds the real client next to the stub below.
+// src/ui/ may import it; src/summon/ never imports src/ui/ (structure.md).
+// The stub stays for tests and for builds without Summon; createAgentClient is the real client (summon REQ-7.1).
+import { TransportError, type Transport } from './transport.js';
 
 export type ScriptOwnerType = 'button' | 'field' | 'image' | 'card' | 'background' | 'stack';
 
@@ -41,5 +42,37 @@ export function createStubAgentClient(): AgentClient {
   return {
     explain: (_script, _context, signal) => reject(signal),
     fix: (_script, _error, _context, signal) => reject(signal),
+  };
+}
+
+export const AGENT_FAILED = 'The agent is not available right now';
+
+/** A reply wrapped in one Markdown code fence → its content; anything else → trimmed as is. */
+export function stripFence(text: string): string {
+  const fenced = /^\s*```[a-zA-Z]*[ \t]*\r?\n([\s\S]*?)\r?\n?```\s*$/.exec(text);
+  return (fenced ? fenced[1] : text).trim();
+}
+
+const isAbort = (e: unknown) => e instanceof Error && e.name === 'AbortError';
+
+/**
+ * The real client. `transportFor` is called on every request, so storing or clearing a key in Settings
+ * switches between the direct and the server path without a reload (summon REQ-7.2).
+ */
+export function createAgentClient(transportFor: () => Transport): AgentClient {
+  async function ask(send: (t: Transport) => Promise<{ text: string }>): Promise<string> {
+    try {
+      return (await send(transportFor())).text;
+    } catch (e) {
+      if (isAbort(e)) throw e;
+      if (e instanceof TransportError) throw new AgentUnavailableError(e.message);
+      throw new AgentUnavailableError(AGENT_FAILED);
+    }
+  }
+  return {
+    explain: async (script, context, signal) =>
+      (await ask(t => t.send({ kind: 'explain', payload: { script, context } }, signal))).trim(),
+    fix: async (script, error, context, signal) =>
+      stripFence(await ask(t => t.send({ kind: 'fix', payload: { script, error, context } }, signal))),
   };
 }

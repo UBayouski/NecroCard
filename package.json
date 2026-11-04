@@ -3,16 +3,19 @@
   "version": "0.1.0",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.9"
   },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "test": "vitest --run",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint src",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
+    "lint": "eslint src server",
     "check": "npm run typecheck && npm run lint",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "server:build": "tsc -p tsconfig.server.json",
+    "server:start": "node dist-server/server/main.js",
+    "server:dev": "npm run server:build && node --env-file-if-exists=.env dist-server/server/main.js"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

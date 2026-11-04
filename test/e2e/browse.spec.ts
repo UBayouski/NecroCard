@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './apiMock.js';
 
 const surface = (page: Page) => page.getByRole('application', { name: 'HyperCard stack' });
 

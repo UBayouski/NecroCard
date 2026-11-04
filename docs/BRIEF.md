@@ -137,6 +137,8 @@ chunks as put targets, number formatting.
 - Also: "Explain this script" and "Fix this script" from the script editor, which send the script plus the error.
 - Served by a small serverless function with a hard daily request cap and per-IP limit, plus a bring-your-own-key
   option stored only in the browser. The demo URL must stay free through Jan 29, 2027.
+- The AI provider is Google Gemini through the Google AI Studio REST API (`generateContent`), called with `fetch` and
+  no SDK, from a small Node server on Render or, with a bring-your-own key, directly from the browser.
 - Ships with 3 to 4 sample stacks so the app works without any AI calls.
 
 ## 7. Persistence and sharing
@@ -165,7 +167,8 @@ chunks as put targets, number formatting.
 - TypeScript, Vite, no UI framework. DOM rendering for cards and objects. CSS for the 1-bit look.
 - Interpreter: hand-written tokenizer, recursive-descent parser to an AST, tree-walking evaluator. No eval.
 - Tests: Vitest for unit tests, fast-check for property-based tests, Playwright for end-to-end.
-- Hosting: static site on Cloudflare Pages or GitHub Pages; one Cloudflare Worker (or equivalent) for Summon and share blobs.
+- Hosting: Render instead of Cloudflare — a Render static site for the app and one free Render web service (Node 22
+  `node:http`, in `server/`) for Summon and later share blobs, both defined in `render.yaml`.
 - Node 22+. Single `npm run dev`, `npm test`, `npm run build`, `npm run e2e`.
 
 ## 10. Non-goals

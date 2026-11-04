@@ -44,7 +44,7 @@ Use search tools (grep, symbol lookup, AST pattern search) to find keyword table
 (f) Module-boundary and safety violations:
    - `evaluator.ts`, or any module it imports at runtime, importing `tokenizer` or `parser`. Type-only imports of `ast.ts` are allowed. Check whether imports are `import type` or value imports.
    - Any use of `eval`, `new Function`, `Function(...)`, `setTimeout`/`setInterval` with a string argument, or dynamic `import()` of generated code.
-   - `src/interp/` importing from `ui/`, `summon/`, `share/`, or `worker/`. Only `src/model/` types are allowed.
+   - `src/interp/` importing from `ui/`, `summon/`, `share/`, or `server/`. Only `src/model/` types are allowed.
 
 ## Step 4: Evidence rules
 

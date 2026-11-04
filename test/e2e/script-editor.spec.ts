@@ -1,20 +1,14 @@
-import { expect, test, type Page } from '@playwright/test';
+import { collectErrors, expect, test, UNCONFIGURED_MESSAGE, type Page } from './apiMock.js';
 
 const surface = (page: Page) => page.getByRole('application', { name: 'HyperCard stack' });
 const inspector = (page: Page) => page.getByRole('complementary', { name: 'Inspector' });
 const scriptBox = (page: Page) => inspector(page).getByLabel('Script', { exact: true });
 const scriptStatus = (page: Page) => inspector(page).locator('.code-editor [role="status"]');
 
-function collectErrors(page: Page): string[] {
-  const errors: string[] = [];
-  page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
-  page.on('pageerror', err => errors.push(err.message));
-  return errors;
-}
-
 /** Load the quiz, switch to Edit, and open BeginButton's script by double-clicking it. */
 async function openBeginButtonScript(page: Page) {
   await page.goto('/?stack=quiz');
+  await expect(surface(page)).toHaveAttribute('data-card-name', 'Title');
   await expect(surface(page)).toHaveAttribute('data-busy', 'false');
   await page.getByRole('radio', { name: 'Edit', exact: true }).click();
   await expect(surface(page)).toHaveAttribute('data-mode', 'edit');
@@ -48,11 +42,11 @@ test('broken handler shows an inline error; fixing it and clicking in Browse goe
   expect(errors).toEqual([]);
 });
 
-test('Fix with the stub client reports "Summon is not configured" in the status line', async ({ page }) => {
+test('Fix against an unconfigured server reports its message in the status line', async ({ page }) => {
   const errors = collectErrors(page);
   await openBeginButtonScript(page);
   await inspector(page).getByRole('button', { name: 'Fix', exact: true }).first().click();
-  await expect(page.getByRole('alert')).toHaveText('Summon is not configured');
+  await expect(page.getByRole('alert')).toHaveText(UNCONFIGURED_MESSAGE);
   await expect(scriptBox(page)).not.toHaveAttribute('readonly', '');
   expect(errors).toEqual([]);
 });

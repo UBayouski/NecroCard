@@ -4,21 +4,55 @@ import './ui/chrome.css';
 import './ui/browse/browse.css';
 import './ui/edit/edit.css';
 import './ui/script-editor/script-editor.css';
+import './ui/summon/summon.css';
 import { loadFixture, type FixtureName } from './model/fixtures.js';
 import type { Stack } from './model/types.js';
 import { CardStage } from './ui/browse/stage.js';
 import { BrowseRuntime, type StatusLine } from './ui/browse/runtime.js';
-import { createStackPicker, fixtureFromSearch, UNTITLED, urlWithFixture } from './ui/browse/stackPicker.js';
+import {
+  createStackPicker, CUSTOM, fixtureFromSearch, UNTITLED, urlWithFixture, type PickerValue,
+} from './ui/browse/stackPicker.js';
 import { EditController } from './ui/edit/editor.js';
 import { createModeToggle } from './ui/edit/modeToggle.js';
 import { createNewStack } from './ui/edit/newStack.js';
 import { MessageBoxInput } from './ui/script-editor/messageBoxInput.js';
-import { createStubAgentClient } from './summon/agentClient.js';
+import { SettingsDialog } from './ui/summon/settingsDialog.js';
+import { SummonDialog } from './ui/summon/summonDialog.js';
+import { createAgentClient } from './summon/agentClient.js';
+import { createDirectTransport, KEY_STORAGE, testDirectKey } from './summon/directTransport.js';
+import { createServerTransport } from './summon/serverTransport.js';
+import type { Transport } from './summon/transport.js';
+import { createWakeState } from './summon/wake.js';
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+/** The key is read from local storage only, at call time (summon REQ-4.3). */
+function readStoredKey(): string | null {
+  try {
+    const key = localStorage.getItem(KEY_STORAGE);
+    return key && key.trim() !== '' ? key : null;
+  } catch {
+    return null; // storage disabled: the server path still works
+  }
+}
+
+const keyStorage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> = {
+  getItem: k => { try { return localStorage.getItem(k); } catch { return null; } },
+  setItem: (k, v) => localStorage.setItem(k, v),
+  removeItem: k => { try { localStorage.removeItem(k); } catch { /* nothing stored */ } },
+};
+
 function boot(root: HTMLElement): void {
   root.className = 'app';
+
+  // Summon wiring (summon REQ-7): Direct when a key is stored, Server otherwise, chosen per call.
+  const apiBase: string = import.meta.env.VITE_API_URL ?? '';
+  const serverTransport = createServerTransport(apiBase);
+  const directTransport = createDirectTransport(readStoredKey);
+  const transportFor = (): Transport => (readStoredKey() ? directTransport : serverTransport);
+  const wake = createWakeState(apiBase);
+  // Wake a sleeping Render service once; never blocks rendering, failures are silent.
+  if (!readStoredKey()) wake.start();
 
   const toolbar = document.createElement('header');
   toolbar.className = 'chrome-toolbar';
@@ -47,7 +81,7 @@ function boot(root: HTMLElement): void {
   const messageBoxInput = new MessageBoxInput();
   const messageBox = messageBoxInput.input;
 
-  let current: FixtureName | typeof UNTITLED = fixtureFromSearch(location.search);
+  let current: PickerValue = fixtureFromSearch(location.search);
   const picker = createStackPicker(key => { void loadKey(key); });
   picker.setValue(current);
 
@@ -55,6 +89,27 @@ function boot(root: HTMLElement): void {
   newStackButton.type = 'button';
   newStackButton.className = 'chrome-button';
   newStackButton.textContent = 'New Stack';
+
+  const summonButton = document.createElement('button');
+  summonButton.type = 'button';
+  summonButton.className = 'chrome-button';
+  summonButton.textContent = 'Summon';
+
+  const settingsButton = document.createElement('button');
+  settingsButton.type = 'button';
+  settingsButton.className = 'chrome-button';
+  settingsButton.textContent = 'Settings';
+
+  /** Toolbar controls are disabled while scripts run or a summon is pending. */
+  let summoning = false;
+  const updateToolbar = () => {
+    const busy = runtime.isBusy || summoning;
+    picker.setDisabled(busy);
+    newStackButton.disabled = busy;
+    summonButton.disabled = busy;
+    toggle.setDisabled(busy);
+    messageBox.disabled = busy || editor.mode === 'edit';
+  };
 
   // `editor` is declared below; these callbacks only run after it exists.
   const toggle = createModeToggle(mode => {
@@ -64,12 +119,7 @@ function boot(root: HTMLElement): void {
 
   const runtime = new BrowseRuntime(stage, status, {
     dialogInert: () => [messageBox, toolbar],
-    onBusyChange: busy => {
-      picker.setDisabled(busy);
-      newStackButton.disabled = busy;
-      toggle.setDisabled(busy);
-      messageBox.disabled = busy || editor.mode === 'edit';
-    },
+    onBusyChange: () => updateToolbar(),
     onLoad: () => editor.reset(),
   });
 
@@ -78,13 +128,16 @@ function boot(root: HTMLElement): void {
     inspectorHost: workspace,
     toolbarHost: editToolbarHost,
     onModeChange: mode => toggle.set(mode),
-    // Spec `summon` replaces this one line with the real client.
-    agent: createStubAgentClient(),
+    agent: createAgentClient(transportFor),
   });
+
+  /** Bumped by every load, so a slow fixture import cannot replace a newer New Stack or Summon. */
+  let loadSeq = 0;
 
   /** Load any stack exactly like a fixture: Browse mode, history cleared (REQ-1.4). */
   async function loadStack(stack: Stack): Promise<boolean> {
     if (runtime.isBusy) return false;
+    loadSeq++;
     editor.reset();
     return runtime.load(stack);
   }
@@ -94,8 +147,10 @@ function boot(root: HTMLElement): void {
       picker.setValue(current);
       return;
     }
+    const seq = ++loadSeq;
     try {
       const stack = await loadFixture(key);
+      if (seq !== loadSeq) return; // superseded while the fixture was importing
       if (!(await loadStack(stack))) {
         picker.setValue(current);
         return;
@@ -129,6 +184,35 @@ function boot(root: HTMLElement): void {
     })();
   });
 
+  /** A summoned stack loads like New Stack, then opens in Edit mode under its own name (summon REQ-8.3). */
+  async function loadSummoned(stack: Stack): Promise<void> {
+    if (!(await loadStack(stack))) throw new Error('A script is still running. Try again when it finishes.');
+    current = CUSTOM;
+    picker.showCustom(stack.name);
+    const url = new URL(location.href);
+    url.searchParams.delete('stack');
+    history.replaceState(null, '', url.toString());
+    if (!editor.enter()) status.show('The stack is loaded. Switch to Edit when its opening scripts finish.');
+  }
+
+  const summonDialog = new SummonDialog({
+    transport: transportFor,
+    wake,
+    onLoaded: loadSummoned,
+    onBusyChange: pending => {
+      summoning = pending;
+      updateToolbar();
+    },
+  });
+  const settingsDialog = new SettingsDialog({
+    storage: keyStorage,
+    testKey: (key, signal) => testDirectKey(key, signal),
+  });
+  summonButton.addEventListener('click', () => {
+    if (!runtime.isBusy) summonDialog.open();
+  });
+  settingsButton.addEventListener('click', () => settingsDialog.open());
+
   messageBox.addEventListener('keydown', e => {
     if (e.key !== 'Enter' || runtime.isBusy || editor.mode === 'edit') return;
     e.preventDefault();
@@ -141,7 +225,7 @@ function boot(root: HTMLElement): void {
     });
   });
 
-  toolbar.append(title, picker.el, newStackButton, toggle.el);
+  toolbar.append(title, picker.el, newStackButton, summonButton, settingsButton, toggle.el);
   root.replaceChildren(toolbar, editToolbarHost, workspace, statusEl, messageBoxInput.el);
   stage.observe();
   void loadKey(fixtureFromSearch(location.search));

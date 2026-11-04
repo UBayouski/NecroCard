@@ -6,8 +6,11 @@
 - **Bundler**: Vite. Single `npm run dev`, `npm test`, `npm run build`, `npm run e2e`.
 - **Runtime**: Node 22+.
 - **UI framework**: none. DOM rendering for cards and objects. CSS for the 1-bit look.
-- **Backend**: one Cloudflare Worker (or equivalent) for Summon and share blobs.
-- **Hosting**: static site on Cloudflare Pages or GitHub Pages.
+- **Backend**: one small Node 22 `node:http` server in `server/` (Render free web service) for Summon, and later share
+  blobs.
+- **Hosting**: static site on Render; the server is a Render web service. Both are defined in `render.yaml`.
+- **AI provider**: Google Gemini through the Google AI Studio REST API (`generateContent`), called with `fetch` from
+  the server and, with a bring-your-own key, from the browser. No AI SDKs.
 
 ## Hard constraints
 

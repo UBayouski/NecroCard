@@ -443,3 +443,84 @@ What changed: The pattern for this project is now settled: Kiro proves what it c
 it cannot, a human checks that in a real browser, and the fixes come back with real-browser e2e tests so the gap is
 closed for good. Caret position after undo lands at the line start, which is inherent to using the browser's own
 undo stack rather than the editor's, and was accepted. Screenshots copied to docs/screenshots/.
+
+## 2026-11-03 — Spec 6: summon (requirements, design, tasks)
+Surface: CLI (Auto)
+Features: spec, steering
+What I asked for: a `summon` spec from BRIEF sections 6 and 9 with two overrides decided before the prompt: Google
+Gemini through the AI Studio REST API instead of the brief's unspecified provider, and Render (static site plus a
+free Node web service) instead of a Cloudflare Worker. No SDK on either side; both call `generateContent` with
+`fetch`, so the project keeps its single runtime dependency. The prompt fixed the shape (pure prompt builders whose
+example scripts are tested against the real parser, a pure pipeline over an injected transport with one retry,
+server and bring-your-own-key transports, in-memory daily and per-IP caps, CORS, a health wake-up for Render's cold
+start, mocked e2e) and asked for the exact browser-to-server JSON contract and the model id as open questions.
+What Kiro did: REQ-1 to REQ-10, a design with the full JSON contract (`{kind, payload}` in, `{ok, text}` or
+`{ok, error:{kind, message}}` out, eleven error kinds mapped to HTTP statuses, remaining-count headers), a Render
+blueprint, and ten tasks. It chose `gemini-3.5-flash-lite` after reading Google's models, pricing and deprecation
+pages, and gave the reason: `gemini-2.5-flash` is retired on December 1, 2026 and Google routes its requests to
+exactly this model. It listed eighteen open questions with defaults and two things it could not verify (whether a
+Render static site can read another service's hostname through `fromService`, and whether the service names are
+free).
+Review: I re-read Google's models, changelog and deprecations pages myself. The model id, its stable status and the
+December 1 routing are all as Kiro said; the free-tier claim is not on those pages and will be settled by the first
+real request. One correction from the same changelog: Google deprecated the `temperature`, `top_p` and `top_k`
+sampling parameters on July 21, 2026, and the design still sends `temperature: 0.7`, so that field goes. The
+unverified `fromService` lookup is replaced by the literal API hostname, since a deploy is a one-time event and a
+literal cannot surprise anyone. The not-supported list in the grammar summary, the id and date rules, and the
+steering boundaries all match `necrotalk.md` and the schema. Node on this machine is 24, so the `>=22.9` engine
+bump for `--env-file-if-exists` costs nothing. The other sixteen defaults stand.
+
+## 2026-11-03 — Spec 6: summon executed (tasks 1 to 9), mocked and real Playwright MCP runs
+Surface: CLI (Auto)
+Features: spec, steering, mcp
+What I asked for: Tasks 1 to 5, stop; Task 6 up to the server check, where I ran `server:dev` myself without a key
+and then with one, and pasted the results; Tasks 7 and 8 with two README fixes; then Task 9 (mocked e2e and a mocked
+MCP run) plus one extra real summon through the Vite proxy with no mock.
+What Kiro did: `src/summon/` (contract, prompts and grammar summary, a fetch-only Gemini client, extraction,
+integrity checks, the pipeline with one retry, server and direct transports, the wake-up, the real `AgentClient`),
+`server/` (a `node:http` handler tested without sockets, in-memory caps, CORS, a separate `tsconfig.server.json`),
+`render.yaml`, `.env.example`, and the Summon and Settings dialogs. 855 Vitest tests in 59 files and 11 e2e tests,
+with typecheck, lint, both builds and e2e green; `src/interp`, `src/model` and the fixtures untouched. My server
+check: 503 `not_configured` without a key, then a real explain in 819 ms, which confirmed `gemini-3.5-flash-lite`
+on the free tier. Task 8 broke six existing e2e tests: the new health request on page load went through the Vite
+proxy to a port with nothing behind it and logged console errors. Kiro added one shared Playwright fixture that
+mocks an unconfigured server for every spec rather than relaxing the console checks.
+MCP, mocked: routes installed with `browser_run_code_unsafe` before navigating; Summon, first example, Summon;
+the canned "Ghost Quiz" loaded in Edit mode, card 1 of 2, named in the picker, one `/api/summon` request, no
+console errors or warnings. Screenshot `.playwright-mcp/summon-loaded.png`.
+MCP, real: routes removed, health returned the real server (ok, 100 left). The first example prompt produced
+"Haunted Quiz" from Gemini in 4.6 s (resource timing of the single `/api/summon` call), with no retry: the first
+reply passed the schema, integrity and parse checks. It loaded in Edit mode on card Q1 of 3 (two questions and a
+Results card, a Score field showing 0). In Browse, clicking "A) Salt" went to Q2 with no dialog or error. Console:
+only Vite's two debug lines, no errors or warnings. Screenshots `.playwright-mcp/summon-real.png` and
+`summon-real-browse.png`. Kiro also reported its own slip: it sent the Summon click and the example click in one
+batch, against the one-action-per-call rule; the timestamps showed they ran in order and a state check confirmed
+the prompt before it went on.
+What changed: The summoned stack is valid but thin as a quiz: the Score field is a card object on Q1, so it does not
+appear on Q2. That is a prompt-quality matter (the system instruction could say that shared fields such as a score
+belong on the background), not a pipeline bug, and is left for review.
+The flaky e2e run Kiro had reported after Task 8 came back during the final check, about one run in two. It was not
+the Vite dependency reload it first guessed: it piped the web server's output, saw no reload, and read the failure
+snapshot instead (the quiz on screen after the test had seen "Untitled"). The cause was a race in `src/main.ts`
+older than Summon: the first fixture is a dynamic import, and a New Stack or Summon that landed before it resolved
+was overwritten by the quiz a moment later. The heavier page load made the window wider. Kiro fixed it in the app
+(every load bumps a counter, and a fixture import that finishes after a newer load is dropped) and made the e2e
+tests wait for the first card rather than only `data-busy`; eight runs in a row, each after `npm test`, then passed.
+
+## 2026-11-03 — Spec 6 closed: prompt rule, Task 10, review notes
+Surface: CLI (Auto)
+Features: spec, steering, mcp
+What I asked for: after Kiro's own entry above, one prompt-quality change it had proposed but not made (objects that
+must appear on every card are background objects, with an example of a card button updating a background field),
+then Task 10, the final verification.
+What Kiro did: added the rule and the example to the system instruction, and checked against objectOps.ts that a
+card button can really address a background field at run time before relying on it in the prompt; the existing
+prompt tests cover the example because they validate and parse it. Task 10 passed: no eval, innerHTML or AI SDK in
+the new code, no src/summon import of src/ui, no key in any URL, every new file under 300 lines, .env ignored and
+untracked. It declined to spend another request proving the new rule improves output, and said so.
+What changed: My own checks matched Kiro's report (855 unit tests, 11 e2e, typecheck clean, protected directories
+untouched, package.json changed only in scripts and the engine floor). Two things Kiro flagged on its own and did not
+do until asked, the prompt rule and a README line outside its task, are the restraint the steering asks for. The
+three MCP screenshots are copied to docs/screenshots/. Open for later specs: the round rect bevel corner artifact
+and the selection outline (retro-skin), the "Status: scaffolding" README line (final pass), and the Render
+deployment itself (after sharing, when the blueprint is final).

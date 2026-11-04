@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
-import { createStackPicker, fixtureFromSearch, FIXTURES, UNTITLED, urlWithFixture } from './stackPicker.js';
+import { createStackPicker, CUSTOM, fixtureFromSearch, FIXTURES, UNTITLED, urlWithFixture } from './stackPicker.js';
 import { loadFixture } from '../../model/fixtures.js';
 
 describe('stack picker', () => {
@@ -57,5 +57,43 @@ describe('stack picker: Untitled entry (edit-mode REQ-1.5)', () => {
     expect(onChange).not.toHaveBeenCalled(); // re-selecting Untitled loads nothing
     picker.setValue('adventure');
     expect(values()).toEqual(['quiz', 'adventure', 'flashcards']);
+  });
+});
+
+describe('stack picker: summoned entry (summon REQ-8.3)', () => {
+  const values = (picker: ReturnType<typeof createStackPicker>) => Array.from(picker.select.options).map(o => o.value);
+
+  it('showCustom adds one entry with the stack name, renames it on the next summon, and selects it', () => {
+    const onChange = vi.fn();
+    const picker = createStackPicker(onChange);
+    picker.showCustom('Ghost Quiz');
+    expect(values(picker)).toEqual(['quiz', 'adventure', 'flashcards', CUSTOM]);
+    expect(picker.select.selectedOptions[0].textContent).toBe('Ghost Quiz');
+    picker.showCustom('Crypt <b>Crawl</b>');
+    expect(values(picker)).toEqual(['quiz', 'adventure', 'flashcards', CUSTOM]);
+    expect(picker.select.selectedOptions[0].textContent).toBe('Crypt <b>Crawl</b>');
+    expect(picker.select.querySelector('b')).toBeNull();
+    picker.select.dispatchEvent(new Event('change'));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('an empty name reads "Summoned stack"', () => {
+    const picker = createStackPicker(() => {});
+    picker.showCustom('  ');
+    expect(picker.select.selectedOptions[0].textContent).toBe('Summoned stack');
+  });
+
+  it('choosing a fixture or New Stack removes it; New Stack and Summon replace each other', () => {
+    const picker = createStackPicker(() => {});
+    picker.showCustom('A');
+    picker.setValue('quiz');
+    expect(values(picker)).toEqual(['quiz', 'adventure', 'flashcards']);
+    picker.showCustom('A');
+    picker.showUntitled();
+    expect(values(picker)).toEqual(['quiz', 'adventure', 'flashcards', UNTITLED]);
+    picker.showCustom('B');
+    expect(values(picker)).toEqual(['quiz', 'adventure', 'flashcards', CUSTOM]);
+    picker.setValue(CUSTOM);
+    expect(picker.select.value).toBe(CUSTOM);
   });
 });

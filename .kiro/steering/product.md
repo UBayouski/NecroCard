@@ -43,7 +43,7 @@ The whole stack serializes to one JSON document. **Round-trip must be lossless.*
 - Input: plain-English paragraph. Output: valid stack JSON with scripts that parse under NecroTalk.
 - Pipeline: prompt with schema + grammar → request JSON → validate → parse every script → retry once with error list → load.
 - "Explain this script" and "Fix this script" actions are available from the script editor.
-- A small serverless function handles requests with a hard daily cap and per-IP limit.
+- A small server (a free Render web service calling Gemini through the AI Studio REST API) handles requests with a hard daily cap and per-IP limit.
 - Bring-your-own-key option stored only in the browser (never on the server).
 - The demo URL must stay free through **Jan 29, 2027**.
 - Ships with 3–4 sample stacks so the app works without any AI calls.

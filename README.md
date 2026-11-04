@@ -18,11 +18,48 @@ them, and writing small English-like scripts. NecroCard brings that model back i
   visual effects.
 - **Summon.** Type a description, get a working stack with scripts. Explain and fix scripts in the editor.
 - **Share.** Save locally, export JSON, or share a stack by URL.
-- **Look.** 1-bit Macintosh: Chicago-style type, dither patterns, bevelled buttons, dissolve transitions.
+- **Look.** 1-bit Macintosh: classic Mac-style bitmap fonts, dither patterns, bevelled buttons, dissolve transitions.
 
 ## Run
 
-Coming soon. Target: `npm install`, `npm run dev`.
+Requires Node 22.9 or later.
+
+```
+npm install
+npm run dev        # http://localhost:5173
+```
+
+The three sample stacks work with no server and no AI calls. Other commands: `npm test` (unit and property tests),
+`npm run build`, `npm run e2e` (Playwright), `npm run typecheck`, `npm run lint`.
+
+## Running Summon locally
+
+Summon, Explain and Fix call Google Gemini through a small Node server in `server/`. The app works without it: the
+sample stacks need no AI calls.
+
+1. Get a Gemini API key in [Google AI Studio](https://aistudio.google.com/apikey).
+2. Copy `.env.example` to `.env` and set `GEMINI_API_KEY`. `.env` is ignored by git; never commit it.
+3. Start the server: `npm run server:dev` (builds to `dist-server/` and listens on port 8787; Node 22.9+).
+4. Start the app in a second terminal: `npm run dev`. Vite proxies `/api` to `http://localhost:8787`.
+
+Check the server with `GET http://localhost:8787/api/health`: `"ok": true` means a key is set. The server caps
+requests per UTC day (`DAILY_CAP`, default 100) and per IP (`PER_IP_CAP`, default 10); the counters live in memory
+and reset when it restarts. Alternatively, paste your own key in the app's Settings: it stays in this browser's
+local storage and is sent only to Google.
+
+## Deploying to Render
+
+`render.yaml` is a Render Blueprint with two services:
+
+- `necrocard-api`: a free Node web service (`npm ci && npm run server:build`, `npm run server:start`, health check
+  `/api/health`).
+- `necrocard`: a static site built with `npm ci && npm run build` and published from `dist`, with `VITE_API_URL`
+  pointing at the API service.
+
+In the Render dashboard, create a Blueprint from this repository, then set `GEMINI_API_KEY` on `necrocard-api` (it is
+marked `sync: false`, so the key is never stored in the repo). If either service name is taken, Render assigns a
+different `onrender.com` hostname: update `VITE_API_URL` and `ALLOWED_ORIGINS` in `render.yaml` to match. The free
+web service sleeps after 15 minutes without traffic; the app sends one health request on page load to wake it.
 
 ## Built with Kiro
 

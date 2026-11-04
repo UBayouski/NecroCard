@@ -29,14 +29,20 @@ export function urlWithFixture(href: string, key: FixtureName): string {
 export interface StackPicker {
   el: HTMLElement;
   select: HTMLSelectElement;
-  setValue(key: FixtureName | typeof UNTITLED): void;
+  setValue(key: PickerValue): void;
   setDisabled(disabled: boolean): void;
   /** Add (if missing) and select an "Untitled" entry for a new stack (edit-mode REQ-1.5). */
   showUntitled(): void;
+  /** Add or rename, and select, one entry showing a summoned stack's name (summon REQ-8.3). */
+  showCustom(name: string): void;
 }
 
 /** Picker value for a stack made with New Stack. */
 export const UNTITLED = 'untitled';
+/** Picker value for a summoned stack. */
+export const CUSTOM = 'custom';
+
+export type PickerValue = FixtureName | typeof UNTITLED | typeof CUSTOM;
 
 /** A labelled <select> of the bundled stacks. `onChange` receives the chosen fixture key. */
 export function createStackPicker(onChange: (key: FixtureName) => void): StackPicker {
@@ -51,16 +57,19 @@ export function createStackPicker(onChange: (key: FixtureName) => void): StackPi
     option.textContent = f.name;
     select.append(option);
   }
-  const untitled = () => select.querySelector<HTMLOptionElement>(`option[value="${UNTITLED}"]`);
-  const setValue = (key: FixtureName | typeof UNTITLED) => {
-    if (key === UNTITLED && !untitled()) {
-      const option = document.createElement('option');
-      option.value = UNTITLED;
-      option.textContent = 'Untitled';
-      select.append(option);
-    } else if (key !== UNTITLED) {
-      untitled()?.remove(); // a fixture was chosen: the new stack is gone (no persistence)
-    }
+  const extra = (value: string) => select.querySelector<HTMLOptionElement>(`option[value="${value}"]`);
+  const addExtra = (value: string, text: string) => {
+    const option = extra(value) ?? document.createElement('option');
+    option.value = value;
+    option.textContent = text;
+    if (!option.parentNode) select.append(option);
+  };
+  // Untitled and the summoned entry are transient (no persistence until spec `sharing`):
+  // choosing anything else removes them.
+  const setValue = (key: PickerValue) => {
+    if (key === UNTITLED && !extra(UNTITLED)) addExtra(UNTITLED, 'Untitled');
+    if (key !== UNTITLED) extra(UNTITLED)?.remove();
+    if (key !== CUSTOM) extra(CUSTOM)?.remove();
     select.value = key;
   };
   select.addEventListener('change', () => {
@@ -73,5 +82,9 @@ export function createStackPicker(onChange: (key: FixtureName) => void): StackPi
     setValue,
     setDisabled: disabled => { select.disabled = disabled; },
     showUntitled: () => setValue(UNTITLED),
+    showCustom: name => {
+      addExtra(CUSTOM, name.trim() === '' ? 'Summoned stack' : name);
+      setValue(CUSTOM);
+    },
   };
 }

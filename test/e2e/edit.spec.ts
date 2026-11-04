@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './apiMock.js';
 import { encodeBitsPngBytes } from '../../src/ui/edit/png.js';
 
 const surface = (page: Page) => page.getByRole('application', { name: 'HyperCard stack' });
@@ -57,6 +57,7 @@ test('image import: local file becomes a 1-bit PNG data URL, no network requests
     if (!url.startsWith(origin) && !url.startsWith('data:') && !url.startsWith('blob:')) foreign.push(url);
   });
   await page.goto('/?stack=quiz');
+  await expect(surface(page)).toHaveAttribute('data-card-name', 'Title');
   await expect(surface(page)).toHaveAttribute('data-busy', 'false');
   await mode(page, 'Edit').click();
 
@@ -81,6 +82,7 @@ test('image import: local file becomes a 1-bit PNG data URL, no network requests
 test('New Stack: add a button that renames itself, click it in Browse', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/?stack=quiz');
+  await expect(surface(page)).toHaveAttribute('data-card-name', 'Title');
   await expect(surface(page)).toHaveAttribute('data-busy', 'false');
 
   await page.getByRole('button', { name: 'New Stack', exact: true }).click();

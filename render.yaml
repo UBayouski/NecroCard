@@ -1,0 +1,32 @@
+# Render Blueprint: the NecroCard static site and the Summon server (free plan).
+services:
+  - type: web
+    name: necrocard-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run server:build
+    startCommand: npm run server:start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash-lite
+      - key: DAILY_CAP
+        value: "100"
+      - key: PER_IP_CAP
+        value: "10"
+      - key: ALLOWED_ORIGINS
+        value: https://necrocard.onrender.com,http://localhost:5173,http://localhost:5174
+
+  - type: web
+    name: necrocard
+    runtime: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      # The hostname changes if the service name necrocard-api is taken on Render.
+      - key: VITE_API_URL
+        value: https://necrocard-api.onrender.com

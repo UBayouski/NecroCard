@@ -17,18 +17,21 @@ necrocard/
 │   ├── ui/                 # DOM rendering, card surface, browse mode, edit mode
 │   │   ├── browse/         # Browse mode: card render, hit testing, transitions
 │   │   ├── edit/           # Edit mode: selection, move, resize, inspector, tools
-│   │   └── script-editor/  # Script editor: highlighting, inline errors, message box
-│   ├── summon/             # AI authoring: prompt, validation, retry, BYO-key
+│   │   ├── script-editor/  # Script editor: highlighting, inline errors, message box
+│   │   └── summon/         # Summon and Settings (BYO key) dialogs
+│   ├── summon/             # AI authoring: prompts, Gemini client, validation, retry, transports, BYO-key
 │   ├── share/              # localStorage autosave, export/import, URL share
-│   ├── worker/             # Cloudflare Worker source (Summon endpoint, blob store)
 │   └── assets/             # Fonts, patterns, static images
+├── server/                 # Node 22 node:http server for Render (Summon endpoint, caps; later blob store)
 ├── test/
 │   └── e2e/                # Playwright end-to-end tests
 ├── fixtures/               # Sample stack JSON files (3–4 stacks)
 ├── public/                 # Static assets served by Vite
 ├── index.html
+├── render.yaml             # Render blueprint: static site + free web service
 ├── vite.config.ts
 ├── tsconfig.json
+├── tsconfig.server.json    # Server build to dist-server/
 ├── package.json
 └── README.md
 ```
@@ -47,11 +50,11 @@ necrocard/
 | Module | Allowed imports | Forbidden imports |
 |---|---|---|
 | `src/model/` | Nothing from `src/` except other `model/` files | `interp/`, `ui/`, `summon/`, `share/` |
-| `src/interp/` | `src/model/` types only | `ui/`, `summon/`, `share/`, `worker/` |
-| `src/ui/` | `src/model/`, `src/interp/`, `src/summon/` public modules (e.g. `src/summon/agentClient.ts`) | `src/worker/`, non-public `src/summon/` internals |
-| `src/summon/` | `src/model/`, `src/interp/` | `src/ui/` (never, in any form) |
+| `src/interp/` | `src/model/` types only | `ui/`, `summon/`, `share/`, `server/` |
+| `src/ui/` | `src/model/`, `src/interp/`, `src/summon/` public modules (e.g. `src/summon/agentClient.ts`) | `server/`, non-public `src/summon/` internals |
+| `src/summon/` | `src/model/`, `src/interp/` | `src/ui/` (never, in any form); browser globals at module top level (the server imports some of its modules) |
 | `src/share/` | `src/model/` | `src/interp/`, `src/ui/` internals |
-| `src/worker/` | `src/model/`, `src/summon/` | All browser APIs |
+| `server/` | `src/model/`, `src/summon/` | `src/ui/`, all browser APIs |
 
 The evaluator (`src/interp/`) must not import the tokenizer or parser at runtime — only AST types.
 
@@ -64,8 +67,8 @@ The evaluator (`src/interp/`) must not import the tokenizer or parser at runtime
 | `browse-mode` | `src/ui/browse/` |
 | `edit-mode` | `src/ui/edit/` |
 | `script-editor` | `src/ui/script-editor/` |
-| `summon` | `src/summon/`, `src/worker/` |
-| `sharing` | `src/share/`, `src/worker/` |
+| `summon` | `src/summon/`, `src/ui/summon/`, `server/` |
+| `sharing` | `src/share/`, `server/` |
 | `retro-skin` | `src/ui/`, `src/assets/`, CSS files |
 
 ## File size and scope
