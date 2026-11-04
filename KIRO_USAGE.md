@@ -677,3 +677,32 @@ ids rewritten and all five cards pointing at the renamed background. 989 unit te
 The second fix came from a screenshot: an edited sample restored from autosave appeared in the stack picker under the
 same title as the pristine sample. The custom entry is now labelled "<name> (your copy)" when the name collides with
 a bundled stack, with a unit test and two e2e assertions.
+
+## 2026-11-04 — Two more fixes between specs: background buttons unclickable, selection paint in the script editor
+Surface: CLI (Auto)
+Features: mcp, vibe (no spec; both prompts written from a human check in Chrome)
+What happened: the first summoned flashcards stack could not be navigated. Its Next and Prev buttons sit on the
+background, as the Summon prompt asks, and the card-objects layer is a full-size transparent div above the
+background layer, so no background object ever received a pointer event. The three bundled stacks have empty
+backgrounds, which is why nothing had caught it. Kiro gave the card layer `pointer-events: none` with its children
+`auto`, and added a real-Chromium e2e that loads an inline two-card stack through a share link, clicks a background
+Next button and expects card 2 (commit "Fixing bg overlay bug").
+The second finding was a select-all in the script editor: Chrome painted the selection bands at the wrong widths on
+some rows, a long row getting a band a few characters wide and the short row after it a full-width band. My own
+reproduction in headless Chromium went in circles for an hour because Playwright hides scroll bars by default, which
+made variants pass or fail for the wrong reasons. Kiro's e2e launched its own Chromium with scroll bars shown and
+pinned the cause in three probes: bars painted and area narrowed fails, area narrowed without bars passes, so it is
+the painted scroll bars. Fix: `scrollbar-width: none` on the textarea; it still scrolls by caret, keys and wheel,
+confirmed through MCP with the mirror following (169 px, then 188 px). The 20 px font size I had proposed first was
+tried, measured, found not to help, and reverted exactly.
+Review: Kiro declined to guess at the cause and stopped to ask when its test still failed at 20 px, which is the
+behaviour the steering asks for. The pixel e2e (clip, decode through an <img> and a canvas, two sampled pixels) is a
+pattern worth reusing for any paint-level check. One sharing reload e2e failed once in a full run and passed 21 of 21
+on repeat; left as is and noted. Screenshot copied to docs/screenshots/script-select-all.png. 990 unit tests, 25 e2e.
+Follow-up the same day: the summoned quiz's "on openCard" sat in a field's script, where card messages never arrive.
+Kiro added the placement rule to the system instruction and an integrity error for openCard, closeCard, openStack
+or closeStack in any object script, read from the parser's AST so a mention in a comment or string is not flagged;
+a pipeline test shows the retry carrying exactly that one error and the corrected reply loading. It made one
+decision on its own and said so: a mouseUp on a card is valid NecroTalk (an unhandled click passes up), so the
+reverse rule is prompt guidance only, not an error. The property tests' generator now keeps card-message scripts out
+of object slots. 997 unit tests.

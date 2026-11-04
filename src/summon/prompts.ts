@@ -75,6 +75,9 @@ Rules the schema does not check, which are required too:
 - Use lockText true for fields the user should not type into, false for answer fields.
 - Honour every number in the description exactly: five words means five cards, three questions means three.
 - Every script is NecroTalk (below). Empty scripts are "". Put "\\n" between lines inside JSON strings.
+- openCard, closeCard, openStack and closeStack handlers belong in card, background or stack scripts; object scripts
+  receive only mouseUp and mouseDown, so those handlers never run on a button or field. The reverse holds too: mouseUp
+  and mouseDown handlers belong on buttons and fields, not on cards.
 
 This is the shape of a valid stack:
 ${JSON.stringify(EXAMPLE_STACK)}

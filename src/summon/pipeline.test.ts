@@ -8,7 +8,7 @@ import { NecroTalkError } from '../interp/errors.js';
 import type { CardObject, Stack } from '../model/types.js';
 import { LIMITS, type SummonRequest } from './contract.js';
 import { GRAMMAR_EXAMPLES } from './grammar.js';
-import { scriptsOf } from './integrity.js';
+import { cardMessageHandlers, scriptsOf } from './integrity.js';
 import { checkReply, MAX_SCHEMA_ERRORS, retryErrors, schemaErrors, SummonError, summonStack, type SummonProgress } from './pipeline.js';
 import { validateStack, ValidationError } from '../model/validate.js';
 import { TransportError, type Transport, type TransportReply } from './transport.js';
@@ -41,6 +41,8 @@ const SCRIPT_POOL: string[] = [
   ...GRAMMAR_EXAMPLES.map(e => e.script),
   ...FIXTURES.flatMap(f => scriptsOf(f).map(s => s.script)),
 ];
+/** Object scripts must not define openCard and friends (they never run there; integrity rejects them). */
+const OBJECT_SCRIPT_POOL = SCRIPT_POOL.filter(s => cardMessageHandlers(s).length === 0);
 
 const idArb = fc.stringMatching(/^[A-Za-z0-9_-]{8,10}$/);
 const rectArb = fc
@@ -50,7 +52,7 @@ const objectPatchArb = fc.record({
   name: fc.string({ maxLength: 20 }),
   rect: rectArb,
   visible: fc.boolean(),
-  script: fc.constantFrom(...SCRIPT_POOL),
+  script: fc.constantFrom(...OBJECT_SCRIPT_POOL),
   text: fc.string({ maxLength: 60 }),
   style: fc.nat(2),
   flag: fc.boolean(),
@@ -311,6 +313,28 @@ describe('summonStack examples', () => {
     if (!('errors' in result)) return;
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]).toMatch(/\/objects\/0\/name must be string/);
+  });
+
+  it('openCard on a field is retried, and the reply that moves it to the card loads', async () => {
+    const bad = good();
+    const card = bad.cards.find(c => c.objects.some(o => o.type === 'field'))!;
+    const target = card.objects.find(o => o.type === 'field')!;
+    const handler = 'on openCard\n  put "Welcome" into field "' + target.name + '"\nend openCard';
+    target.script = handler;
+    const fixed = good();
+    const fixedCard = fixed.cards.find(c => c.id === card.id)!;
+    fixedCard.script = fixedCard.script.trim() === '' ? handler : `${fixedCard.script}\n${handler}`;
+    expect(cardMessageHandlers(fixedCard.script)).toEqual(['openCard']);
+
+    const { transport, requests } = fakeTransport([JSON.stringify(bad), JSON.stringify(fixed)]);
+    const stack = await summonStack('x', transport);
+    expect(requests).toHaveLength(2);
+    const errors = (requests[1] as Extract<SummonRequest, { kind: 'retry' }>).payload.errors;
+    expect(errors).toEqual([
+      `field "${target.name}" on card "${card.name}": "on openCard" never runs in an object script (openCard goes to the `
+      + 'card, background and stack only); move the handler to the card, background or stack script',
+    ]);
+    expect(stack).toEqual(fixed);
   });
 
   it('caps schema errors, error lines, error count and the previous reply', async () => {

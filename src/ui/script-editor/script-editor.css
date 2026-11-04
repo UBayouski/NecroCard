@@ -102,6 +102,10 @@
 
 .code-editor-input {
   overflow: auto;
+  /* No painted scroll bars: when the textarea paints them, Chrome's selection painter draws bands of the wrong width on
+     some rows (a long row gets a short band, the short row after it a long one). A reserved gutter without bars is
+     fine, so it is the painted bars, not the narrower client area. The textarea still scrolls by wheel, keys and caret. */
+  scrollbar-width: none;
   resize: none;
   outline: none;
   background: transparent;

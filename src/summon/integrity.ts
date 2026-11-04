@@ -1,6 +1,23 @@
 // Checks a schema-valid stack for what the JSON schema cannot express, and lists its scripts with
 // user-facing owner descriptions (summon REQ-3.1 steps 4–5, REQ-3.2).
+import { parse } from '../interp/parser.js';
 import type { CardObject, Stack } from '../model/types.js';
+
+/** Messages sent to the card, then background, then stack. They never visit objects, so an object handler is dead. */
+export const CARD_MESSAGES = ['openCard', 'closeCard', 'openStack', 'closeStack'] as const;
+
+/** Names of the card-message handlers a script defines, as written; [] if none or if it does not parse. */
+export function cardMessageHandlers(script: string): string[] {
+  if (script.trim() === '') return [];
+  let handlers;
+  try {
+    handlers = parse(script).handlers;
+  } catch {
+    return []; // a parse error is reported separately, with its line
+  }
+  const wanted = new Set(CARD_MESSAGES.map(m => m.toLowerCase()));
+  return handlers.map(h => h.name).filter(name => wanted.has(name.toLowerCase()));
+}
 
 export interface ScriptSite {
   /** e.g. `Script of button "Next" on card "Q1"` */
@@ -63,6 +80,12 @@ export function checkIntegrity(stack: Stack): string[] {
   for (const { place, objects } of places) {
     for (const o of objects) {
       if (o.type === 'image') problems.push(`Image "${o.name}" on ${place}: image objects are not allowed in Summon`);
+      for (const name of cardMessageHandlers(o.script)) {
+        problems.push(
+          `${objectOn(o, place)}: "on ${name}" never runs in an object script (${name} goes to the card, background and `
+          + 'stack only); move the handler to the card, background or stack script',
+        );
+      }
     }
   }
   return problems;
