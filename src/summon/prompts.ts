@@ -73,6 +73,7 @@ Rules the schema does not check, which are required too:
   its background share a name space, so a card button can read or set a background field by name, as in the example
   below where the "Next" button on the card updates the "Score" field on the background.
 - Use lockText true for fields the user should not type into, false for answer fields.
+- Honour every number in the description exactly: five words means five cards, three questions means three.
 - Every script is NecroTalk (below). Empty scripts are "". Put "\\n" between lines inside JSON strings.
 
 This is the shape of a valid stack:

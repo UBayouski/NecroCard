@@ -42,6 +42,18 @@
   background: transparent;
 }
 
+/* .card-objects covers the whole card above .background-layer. Without this, a click on a background object
+   lands on the empty card layer. Empty card area passes clicks down; card objects still take their own.
+   The object rules use `all: unset`, which makes pointer-events inherit `none` from this layer, so the
+   children's rule must outrank `.card-surface .button` and friends (0,2,0). */
+.card-objects {
+  pointer-events: none;
+}
+
+.card-surface .card-objects > .card-object {
+  pointer-events: auto;
+}
+
 /* The incoming card during a stepped transition sits above the outgoing one. */
 .card-layer--incoming {
   z-index: var(--z-transition-top);

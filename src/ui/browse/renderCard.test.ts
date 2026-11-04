@@ -92,6 +92,29 @@ describe('renderCard', () => {
     expect(css).not.toMatch(/\.card-surface \.button-roundrect \{[^}]*box-shadow/);
   });
 
+  it('background objects can be clicked: the full-size card-objects layer passes pointer events through', async () => {
+    const next = button('Next');
+    const own = button('Own');
+    const stack = makeStack({
+      backgrounds: [background('Main', [next])],
+      cards: [{ name: 'One', objects: [own] }],
+    });
+    const { layer, elements } = renderCard(stack, 0, noHooks);
+    // The background button sits in the layer BELOW the full-size card layer, so the card layer must not catch clicks.
+    const bgLayer = layer.querySelector('.background-layer')!;
+    const cardLayer = layer.querySelector('.card-objects')!;
+    expect(bgLayer.contains(elements.get(next.id)!)).toBe(true);
+    expect(cardLayer.contains(elements.get(own.id)!)).toBe(true);
+    expect(layer.children[1]).toBe(cardLayer);
+
+    // happy-dom has no hit testing, so assert the rules: the layer ignores the pointer, its children take it.
+    for (const el of cardLayer.children) expect(el.classList.contains('card-object')).toBe(true);
+    const css = (await readSource('./browse.css', import.meta.url)).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ');
+    expect(css).toMatch(/(^|[ }])\.card-objects \{ pointer-events: none; \}/);
+    // Object rules use `all: unset` at (0,2,0), which would inherit `none`; the children's rule must outrank them.
+    expect(css).toMatch(/(^|[ }])\.card-surface \.card-objects > \.card-object \{ pointer-events: auto; \}/);
+  });
+
   it('images: data URL → <img>, asset id → placeholder with accessible name', () => {
     const { stack, pic, asset } = sample();
     const { elements } = renderCard(stack, 0, noHooks);

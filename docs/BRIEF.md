@@ -110,6 +110,10 @@ but no spec task for them is created until the core is done. Order of value:
    the person's own stacks in the stack picker, backed by localStorage, with Save, Open and Delete. Today the app keeps
    exactly one autosaved stack, so summoning a second one silently replaces the first; the library lets the demo summon
    several stacks and switch between them. One storage module under `src/share/`, picker changes, tests; no server.
+0b. **Edit background** (app feature; decided 2026-11-04, second after the library): an "Edit background" toggle in
+   the Card menu that swaps which layer the selection, tools and inspector work on, as HyperCard's Edit Background
+   mode did. Today background objects are drawn but not selectable (edit-mode REQ-2.1), and Summon puts shared
+   controls such as Next and Prev on the background, so a summoned stack's navigation cannot be edited.
 1. `item N of <expr>` chunk with comma delimiter (read-only). Enables simple lists in fields. Also `the number of items of`.
 2. `find "text"`: jump to the first card after the current one whose fields contain the text, highlight the field.
    No `find whole`, no `find in field`.
@@ -205,7 +209,9 @@ chunks as put targets, number formatting.
 8. `retro-skin`: 1-bit styling, fonts, patterns, transitions.
 9. `stack-library` (phase 2, first; added 2026-11-04): a named list of the person's stacks in the picker, backed by
    localStorage, with Save, Open and Delete.
-10. `necrotalk-phase2` (only if time remains by Nov 23): `item` chunks, `find`, one-voice `play`, `send`.
+10. `edit-background` (phase 2, second; added 2026-11-04): an "Edit background" toggle in the Card menu so the
+    selection, tools and inspector work on the background layer.
+11. `necrotalk-phase2` (only if time remains by Nov 23): `item` chunks, `find`, one-voice `play`, `send`.
 
 ## 13. Kiro plan (what to use and why)
 
