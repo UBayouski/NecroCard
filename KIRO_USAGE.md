@@ -915,3 +915,35 @@ single-service-hosting design's Request flow section that claimed a directory pa
 a human check against the built server showed `/assets` (no slash, no extension) takes the page-route fallback and
 returns index.html, while only `/assets/` (trailing slash, no index) is 404, and the paragraph now matches the code
 and REQ-1.3 / REQ-1.6. No code changed.
+
+## 2026-11-05 — README review pass (Web surface)
+Surface: Web
+Features: vibe (no spec; a documentation review against the repo)
+What I asked for: a review of README.md as the written Kiroween submission, on the assumption judges never run the
+app: a fixed section order (one-line pitch and live URL; a short "what it is"; a 60-second quick start of clone,
+npm ci, npm run dev, npm test, npm run e2e; the single-service Render hosting; a "Built with Kiro" section pointing
+at .kiro/ and KIRO_USAGE.md with current counts; a NecroTalk summary pointing at BRIEF section 4; the license),
+every claim verified against the repo, nothing but Kiro named as a tool, stale lines removed, tone kept, under 250
+lines. Then this log entry and a KIRO_USAGE edit.
+What Kiro did: read the current README and KIRO_USAGE, then checked every figure against the tree rather than the
+prose. Counted .kiro/: 12 specs, 5 steering docs, 3 hooks (test-on-save, typecheck-lint-before-finish,
+task-done-chime), 1 custom agent (necrotalk-reviewer), one settings/mcp.json. Confirmed 73 unit test files and 9
+Playwright spec files on disk, and used the totals of 1079 unit tests and 29 e2e, which were run outside this
+session on this same commit (f2790a0) and reported passing. Verified render.yaml is one free web service whose
+start command serves dist/ and answers /api, package.json's scripts and the Node 22.9 engine floor, and BRIEF
+section 4 as the source for the NecroTalk summary (play is now implemented, so it is listed as covered). Rewrote
+README to the required order at 126 lines: fixed the quick start to npm ci and added the git clone and the npm test
+/ npm run e2e steps; retitled "Deploying to Render" to "Hosting" and removed the stale split-deployment line about
+VITE_API_URL and ALLOWED_ORIGINS, which the single-service move retired; replaced the "the full write-up is added
+before submission" placeholder with the current counts and a pointer to this log, worded "as of 2026-11-05" so it
+does not imply the project is closed.
+What changed because of it (time saved, bug caught, decision made): network access in this session was
+repository-only — npm ci failed with a 403 from the registry (yocto-queue blocked) — so unlike the CLI sessions,
+this Web session could not install packages, run the suites, or do a Playwright MCP run. The 1079/29 totals were
+instead confirmed by a Vitest and Playwright run outside this session, on commit f2790a0, before the pull request
+was opened. That is the main difference from the CLI work: every earlier entry cites a live test count from a run
+in that same session, whereas this pass verifies the on-disk file counts directly (73 unit, 9 e2e) and relies on
+the out-of-session run for the case totals. The review caught two stale statements in the README (the
+split-deployment env-var sentence and the write-up placeholder) and corrected the quick start to match how a judge
+would actually clone and run the repo. Scope was README.md and KIRO_USAGE.md only; no code, tests, or other files
+touched, and no tool other than Kiro is named.
