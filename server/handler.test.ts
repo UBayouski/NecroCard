@@ -10,6 +10,7 @@ const KEY = 'AIzaSy-server-secret-9876';
 const SITE = 'https://necrocard.onrender.com';
 const baseConfig: ServerConfig = {
   apiKey: KEY, model: 'gemini-3.5-flash-lite', dailyCap: 3, perIpCap: 2, allowedOrigins: [SITE, 'http://localhost:5173'], port: 8787,
+  staticDir: null,
 };
 const context: ScriptContext = {
   owner: { type: 'button', name: 'Go' }, stackName: 'S', cardName: 'C', backgroundName: 'B', objectNames: [],
@@ -184,6 +185,17 @@ describe('CORS', () => {
       expect((await send({ method: 'GET', path: '/api/health' })).data.remainingDay).toBe(3);
     },
   );
+
+  it('an unlisted origin that matches the Host header is allowed (one service serves app and API)', async () => {
+    const { send } = setup({ config: { allowedOrigins: [] } });
+    const host = 'necrocard-xyz.onrender.com';
+    const res = await send({ json: summon, headers: { origin: `https://${host}`, host } });
+    expect(res.status).toBe(200);
+    expect(res.headers['Access-Control-Allow-Origin']).toBe(`https://${host}`);
+    for (const origin of ['https://evil.example', `https://${host}.evil.example`, `https://evil.example/${host}`]) {
+      expect((await send({ json: summon, headers: { origin, host } })).status, origin).toBe(403);
+    }
+  });
 
   it('no Origin (health checks, curl) is served without CORS headers', async () => {
     const { send } = setup();

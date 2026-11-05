@@ -10,14 +10,21 @@ describe('readConfig', () => {
       perIpCap: 10,
       allowedOrigins: ['http://localhost:5173', 'http://localhost:5174'],
       port: 8787,
+      staticDir: 'dist',
     });
+  });
+
+  it('STATIC_DIR picks the app directory; empty turns the app off', () => {
+    expect(readConfig({ STATIC_DIR: ' build ' }).staticDir).toBe('build');
+    expect(readConfig({ STATIC_DIR: '' }).staticDir).toBeNull();
+    expect(readConfig({ STATIC_DIR: '  ' }).staticDir).toBeNull();
   });
 
   it('reads every variable', () => {
     expect(
       readConfig({
         GEMINI_API_KEY: ' k ', GEMINI_MODEL: 'gemini-3.8-flash', DAILY_CAP: '5', PER_IP_CAP: '0',
-        ALLOWED_ORIGINS: 'https://necrocard.onrender.com/, http://localhost:5173', PORT: '10000',
+        ALLOWED_ORIGINS: 'https://necrocard.onrender.com/, http://localhost:5173', PORT: '10000', STATIC_DIR: 'out',
       }),
     ).toEqual({
       apiKey: 'k',
@@ -26,6 +33,7 @@ describe('readConfig', () => {
       perIpCap: 0,
       allowedOrigins: ['https://necrocard.onrender.com', 'http://localhost:5173'],
       port: 10000,
+      staticDir: 'out',
     });
   });
 

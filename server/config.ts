@@ -8,6 +8,8 @@ export interface ServerConfig {
   perIpCap: number;
   allowedOrigins: readonly string[];
   port: number;
+  /** Directory of the built app served on every non-/api path; `null` serves the API only. */
+  staticDir: string | null;
 }
 
 export const DEFAULTS = {
@@ -16,6 +18,7 @@ export const DEFAULTS = {
   perIpCap: 10,
   allowedOrigins: 'http://localhost:5173,http://localhost:5174',
   port: 8787,
+  staticDir: 'dist',
 } as const;
 
 export type Env = Record<string, string | undefined>;
@@ -55,5 +58,7 @@ export function readConfig(env: Env, warn: (message: string) => void = () => {})
     perIpCap: nonNegativeInt(env.PER_IP_CAP, DEFAULTS.perIpCap, 'PER_IP_CAP', warn),
     allowedOrigins: parseOrigins(env.ALLOWED_ORIGINS ?? DEFAULTS.allowedOrigins),
     port,
+    // An explicitly empty STATIC_DIR turns the app off (API only); unset means dist/.
+    staticDir: env.STATIC_DIR === undefined ? DEFAULTS.staticDir : env.STATIC_DIR.trim() || null,
   };
 }

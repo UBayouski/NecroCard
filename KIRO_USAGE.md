@@ -857,3 +857,61 @@ change, since a beep always follows a click or key). Note syntax: a bare `b` is 
 over treating a leading b as a flat. Verification after the run: 1068 unit tests in 72 files, 29 e2e; the fixture
 diffs are exactly the play lines listed above and nothing else; no BOMs; src/model, src/share, server and
 src/ui/edit untouched. parser.ts and evaluator.ts were already over the size guideline before this spec.
+
+## 2026-11-04 — Spec 12: single-service-hosting (review of an outside draft, then the spec)
+Surface: CLI (Auto)
+Features: spec, steering
+Provenance, stated plainly: the code for this spec was not written in this Kiro session. It arrived as an
+uncommitted working-tree draft produced outside Kiro in a separate session — 13 modified files and three new ones
+(server/static.ts, server/static.test.ts, server/fixtures/static/) — that folds the two-service Render layout
+(static site + necrocard-api web service) into one free web service. This session reviewed that draft against the
+steering, the summon spec and the brief, wrote spec 12 to document what the draft does, amended the summon spec with
+superseded notes, and did one voice fix to the steering. The spec was written after the code, which is backwards
+from every spec before it; it is recorded here so the write-up does not imply Kiro generated the implementation.
+What the draft does: the same node:http process serves the built dist/ on every non-/api path (a pure
+createStaticFiles with SPA fallback, hashed-asset immutable caching, media types and path-escape defence) and answers
+/api/* with the existing Summon handler. STATIC_DIR (default dist, empty = API only) is the knob; the CORS gate now
+also accepts any Origin that matches the request's own Host, so production needs no ALLOWED_ORIGINS or VITE_API_URL.
+render.yaml drops to one necrocard service.
+What I did: read the whole diff plus the three new files. The review verdict was sound-and-complete. The one real
+nit was voice, not behaviour: the two hand-edited lines in tech.md's Hosting bullet read softer than the rest of the
+terse doc ("no CORS or VITE_API_URL setup is needed in production"); I rewrote them in the doc's own voice ("One
+origin, so no CORS allow-list or VITE_API_URL in production"). structure.md's inline comments already matched. Then
+I wrote .kiro/specs/single-service-hosting/{requirements,design,tasks}.md in the same shape as the other specs
+(Overview / In-scope / Out-of-scope / REQ-N; Module map / sections / Open questions; ordered Tasks with acceptance
+checks), describing exactly what the draft implements — no new behaviour invented. I added spec 12 to BRIEF.md
+section 12's spec plan.
+What changed: the hosting model is now documented as a spec instead of only living in an untracked diff, and the
+summon spec points forward to it rather than being silently contradicted (see the next entry). Confirmed the
+server/ module boundary still holds: static.ts imports only node:fs/promises and node:path, nothing from src/.
+Verification (nothing committed, pushed or deployed): the six standard checks — typecheck, lint, npm test
+(1079 unit tests in 73 files), npm run build, npm run server:build, npm run e2e (29 tests) — all green. Plus the
+curl smoke test against node dist-server/server/main.js with STATIC_DIR=dist and no key: /api/health -> 200
+{ok:false}; / and a page route /stacks/quiz -> 200 text/html no-cache; a hashed /assets/*.js -> 200
+public, max-age=31536000, immutable; /../package.json and a missing hashed asset -> 404; POST /api/summon with a
+valid body -> 503 not_configured. git status -- src is clean; package.json deps and devDeps unchanged.
+
+## 2026-11-04 — Spec 6 (summon) amended, not rewritten, for the single-service move
+Surface: CLI (Auto)
+Features: spec
+The summon spec shipped the two-service render.yaml, so spec 12 supersedes part of it. Rather than edit history, I
+left summon's requirements, design and tasks as the original record and added dated "superseded by
+single-service-hosting (2026-11-04)" notes at the three places that describe the old layout: REQ-6 (build and
+deployment), the design's render.yaml section, and Task 7 (dev proxy, env and blueprint). Each note names what moved
+(one necrocard service serving dist/ and /api on one origin; ALLOWED_ORIGINS and VITE_API_URL gone; STATIC_DIR added)
+and points at spec 12 for the shipped shape. The build, scripts, .env/.gitignore and server/ requirements in summon
+are unchanged and still accurate, so those were left alone.
+What changed: a reader of the summon spec now sees the two-service design it was executed against and a pointer to
+why the tree no longer matches it, instead of a spec that silently disagrees with render.yaml. Verification is the
+same battery as the entry above (six checks green, curl smoke test matching, e2e 29/29); these were doc-only edits,
+so the numbers did not move. Nothing committed, pushed or deployed.
+
+## 2026-11-04 — Spec 12: two corrections
+Surface: CLI (Auto) / Features: spec
+Fixed the date on the spec-12 work: the previous session stamped it 2026-11-05 from a UTC clock, but it was done on
+2026-11-04 local time like every other entry that day, so all seven occurrences across KIRO_USAGE.md, the three
+summon superseded notes and BRIEF.md section 12 now read 2026-11-04. Also corrected one sentence in the
+single-service-hosting design's Request flow section that claimed a directory path without a trailing slash is 404:
+a human check against the built server showed `/assets` (no slash, no extension) takes the page-route fallback and
+returns index.html, while only `/assets/` (trailing slash, no index) is 404, and the paragraph now matches the code
+and REQ-1.3 / REQ-1.6. No code changed.

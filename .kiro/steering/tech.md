@@ -7,8 +7,9 @@
 - **Runtime**: Node 22+.
 - **UI framework**: none. DOM rendering for cards and objects. CSS for the 1-bit look.
 - **Backend**: one small Node 22 `node:http` server in `server/` (Render free web service) for Summon, and later share
-  blobs.
-- **Hosting**: static site on Render; the server is a Render web service. Both are defined in `render.yaml`.
+  blobs. The same process serves the built app from `dist/` on every non-`/api` path (`server/static.ts`).
+- **Hosting**: one Render web service for both the app and the API, defined in `render.yaml`. One origin, so no CORS
+  allow-list or `VITE_API_URL` in production.
 - **AI provider**: Google Gemini through the Google AI Studio REST API (`generateContent`), called with `fetch` from
   the server and, with a bring-your-own key, from the browser. No AI SDKs.
 

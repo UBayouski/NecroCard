@@ -410,6 +410,12 @@ PORT=8787
 
 ### `render.yaml`
 
+> **Superseded by spec `single-service-hosting` (2026-11-04).** The two-service layout below (a static site plus a
+> separate `necrocard-api` web service with `ALLOWED_ORIGINS` and `VITE_API_URL`) was replaced by one `necrocard` web
+> service that serves the built `dist/` and the `/api` endpoints on one origin. The design below is kept as the
+> original record of this spec; for the shipped blueprint, `.env.example`, and the CORS same-origin rule, see
+> `.kiro/specs/single-service-hosting/`.
+
 ```yaml
 services:
   - type: web

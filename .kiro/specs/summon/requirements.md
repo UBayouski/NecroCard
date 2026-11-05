@@ -224,6 +224,10 @@ One line per request: method, path, status, kind, duration. No prompts, scripts,
 
 ## REQ-6 — Build, scripts and deployment
 
+> **The `render.yaml` shape in this section is superseded by spec `single-service-hosting` (2026-11-04):** one
+> `necrocard` web service now serves the built `dist/` and `/api` on one origin, so the static site, `ALLOWED_ORIGINS`
+> and `VITE_API_URL` are gone. The build, scripts, `.env`/`.gitignore` and `server/` requirements below are unchanged.
+
 - `tsconfig.server.json` compiles `server/` and the `src/summon/` and `src/model/` modules it imports to
   `dist-server/`; `npm run typecheck` checks it too; `npm run lint` covers `server/`.
 - Scripts: `server:build`, `server:start`, `server:dev` (design).

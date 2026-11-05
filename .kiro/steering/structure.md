@@ -22,13 +22,13 @@ necrocard/
 │   ├── summon/             # AI authoring: prompts, Gemini client, validation, retry, transports, BYO-key
 │   ├── share/              # localStorage autosave, export/import, URL share
 │   └── assets/             # Fonts, patterns, static images
-├── server/                 # Node 22 node:http server for Render (Summon endpoint, caps; later blob store)
+├── server/                 # Node 22 node:http server for Render (serves dist/, Summon endpoint, caps; later blob store)
 ├── test/
 │   └── e2e/                # Playwright end-to-end tests
 ├── fixtures/               # Sample stack JSON files (3–4 stacks)
 ├── public/                 # Static assets served by Vite
 ├── index.html
-├── render.yaml             # Render blueprint: static site + free web service
+├── render.yaml             # Render blueprint: one free web service (app + API)
 ├── vite.config.ts
 ├── tsconfig.json
 ├── tsconfig.server.json    # Server build to dist-server/

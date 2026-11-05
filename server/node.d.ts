@@ -1,4 +1,4 @@
-// Minimal ambient types for the parts of node:http the server uses. The repo has no @types/node on purpose:
+// Minimal ambient types for the parts of Node the server uses. The repo has no @types/node on purpose:
 // its globals would change browser types (setTimeout, Buffer) for src/. `process` is reached via globalThis.
 
 declare module 'node:http' {
@@ -21,7 +21,7 @@ declare module 'node:http' {
     statusCode: number;
     headersSent: boolean;
     writeHead(status: number, headers: Record<string, string>): this;
-    end(body?: string): this;
+    end(body?: string | Uint8Array): this;
   }
 
   export interface Server {
@@ -31,4 +31,19 @@ declare module 'node:http' {
   }
 
   export function createServer(listener: (req: IncomingMessage, res: ServerResponse) => void): Server;
+}
+
+declare module 'node:fs/promises' {
+  export interface Stats {
+    isFile(): boolean;
+    isDirectory(): boolean;
+  }
+  export function stat(path: string): Promise<Stats>;
+  export function readFile(path: string): Promise<Uint8Array>;
+}
+
+declare module 'node:path' {
+  export const sep: string;
+  export function resolve(...paths: string[]): string;
+  export function extname(path: string): string;
 }

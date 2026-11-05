@@ -1,10 +1,10 @@
-# Render Blueprint: the NecroCard static site and the Summon server (free plan).
+# Render Blueprint: one free Node web service serves the built app (dist/) and the Summon API.
 services:
   - type: web
-    name: necrocard-api
+    name: necrocard
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run server:build
+    buildCommand: npm ci && npm run build && npm run server:build
     startCommand: npm run server:start
     healthCheckPath: /api/health
     envVars:
@@ -18,15 +18,5 @@ services:
         value: "100"
       - key: PER_IP_CAP
         value: "10"
-      - key: ALLOWED_ORIGINS
-        value: https://necrocard.onrender.com,http://localhost:5173,http://localhost:5174
-
-  - type: web
-    name: necrocard
-    runtime: static
-    buildCommand: npm ci && npm run build
-    staticPublishPath: ./dist
-    envVars:
-      # The hostname changes if the service name necrocard-api is taken on Render.
-      - key: VITE_API_URL
-        value: https://necrocard-api.onrender.com
+      # The app and the API share this service's origin, so no ALLOWED_ORIGINS or VITE_API_URL is needed:
+      # the server accepts any Origin that matches its own Host header.

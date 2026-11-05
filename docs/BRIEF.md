@@ -177,8 +177,8 @@ chunks as put targets, number formatting.
 - TypeScript, Vite, no UI framework. DOM rendering for cards and objects. CSS for the 1-bit look.
 - Interpreter: hand-written tokenizer, recursive-descent parser to an AST, tree-walking evaluator. No eval.
 - Tests: Vitest for unit tests, fast-check for property-based tests, Playwright for end-to-end.
-- Hosting: Render instead of Cloudflare — a Render static site for the app and one free Render web service (Node 22
-  `node:http`, in `server/`) for Summon and later share blobs, both defined in `render.yaml`.
+- Hosting: Render instead of Cloudflare — one free Render web service (Node 22 `node:http`, in `server/`) that
+  serves the built app and the Summon endpoint on one origin, defined in `render.yaml`.
 - Node 22+. Single `npm run dev`, `npm test`, `npm run build`, `npm run e2e`.
 
 ## 10. Non-goals
@@ -213,6 +213,9 @@ chunks as put targets, number formatting.
 10. `edit-background` (phase 2, second; added 2026-11-04): an "Edit background" toggle in the Card menu so the
     selection, tools and inspector work on the background layer.
 11. `necrotalk-phase2` (only if time remains by Nov 23): `item` chunks, `find`, one-voice `play`, `send`.
+12. `single-service-hosting` (added 2026-11-04): fold the Render static site into the API web service so one free
+    service serves the built app and the Summon endpoint on one origin; supersedes the `summon` spec's two-service
+    layout.
 
 ## 13. Kiro plan (what to use and why)
 

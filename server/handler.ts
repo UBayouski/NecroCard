@@ -62,7 +62,7 @@ export function createHandler(deps: HandlerDeps): (req: PlainRequest) => Promise
 
   return async req => {
     const origin = req.headers.origin;
-    if (origin !== undefined && !config.allowedOrigins.includes(origin)) {
+    if (origin !== undefined && !config.allowedOrigins.includes(origin) && !sameOrigin(origin, req.headers.host)) {
       return json(403, {}, failure('forbidden', MESSAGES.forbidden));
     }
     const cors: Record<string, string> = origin
@@ -152,6 +152,13 @@ export function createHandler(deps: HandlerDeps): (req: PlainRequest) => Promise
       return { ...json(GEMINI_STATUS[kind], after, failure(kind, MESSAGES[kind])), kind: request.kind };
     }
   };
+}
+
+/** The app is served by this process, so the browser's own Origin matches the Host header whatever the hostname. */
+function sameOrigin(origin: string, host: string | undefined): boolean {
+  if (!host) return false;
+  const lower = origin.toLowerCase();
+  return lower === `https://${host.toLowerCase()}` || lower === `http://${host.toLowerCase()}`;
 }
 
 function failure(kind: ServerErrorKind, message: string): SummonResponse {

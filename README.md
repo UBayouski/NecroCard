@@ -54,17 +54,20 @@ local storage and is sent only to Google.
 
 ## Deploying to Render
 
-`render.yaml` is a Render Blueprint with two services:
+`render.yaml` is a Render Blueprint with one free Node web service, `necrocard`. Its build runs
+`npm ci && npm run build && npm run server:build`, and `npm run server:start` then serves the built app from `dist`
+on every path except `/api/*`, which the Summon handler answers (health check `/api/health`). Hashed files under
+`/assets/` are sent as immutable; everything else is revalidated.
 
-- `necrocard-api`: a free Node web service (`npm ci && npm run server:build`, `npm run server:start`, health check
-  `/api/health`).
-- `necrocard`: a static site built with `npm ci && npm run build` and published from `dist`, with `VITE_API_URL`
-  pointing at the API service.
+In the Render dashboard, create a Blueprint from this repository, then set `GEMINI_API_KEY` on the service (it is
+marked `sync: false`, so the key is never stored in the repo). The app and the API share one origin, so nothing in
+the blueprint depends on the hostname: the server accepts any `Origin` that matches its own `Host` header, and the
+app calls `/api` relative to the page. `VITE_API_URL` and `ALLOWED_ORIGINS` still work for a split deployment. The
+free web service sleeps after 15 minutes without traffic, so the first page load after a pause takes up to about a
+minute.
 
-In the Render dashboard, create a Blueprint from this repository, then set `GEMINI_API_KEY` on `necrocard-api` (it is
-marked `sync: false`, so the key is never stored in the repo). If either service name is taken, Render assigns a
-different `onrender.com` hostname: update `VITE_API_URL` and `ALLOWED_ORIGINS` in `render.yaml` to match. The free
-web service sleeps after 15 minutes without traffic; the app sends one health request on page load to wake it.
+To run the production layout locally: `npm run build`, then `npm run server:dev` and open
+`http://localhost:8787`.
 
 ## Built with Kiro
 

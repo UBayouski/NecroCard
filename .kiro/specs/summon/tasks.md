@@ -91,6 +91,10 @@ acceptance check. Every task ends with `npm run typecheck`, `npm run lint` and `
 
 ## Task 7 — Dev proxy, env and Render blueprint
 
+> **The `render.yaml` and `.env.example` produced here were superseded by spec `single-service-hosting`
+> (2026-11-04):** the two services became one `necrocard` web service serving `dist/` and `/api` on one origin, and
+> `STATIC_DIR` was added. This task's description is left as the original record.
+
 **Steps:**
 1. `vite.config.ts`: `/api` proxy to `http://localhost:8787`.
 2. `.gitignore`: `.env`, `dist-server/`. `.env.example` per the design.
