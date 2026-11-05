@@ -947,3 +947,28 @@ the out-of-session run for the case totals. The review caught two stale statemen
 split-deployment env-var sentence and the write-up placeholder) and corrected the quick start to match how a judge
 would actually clone and run the repo. Scope was README.md and KIRO_USAGE.md only; no code, tests, or other files
 touched, and no tool other than Kiro is named.
+
+## 2026-11-05 — Devpost submission draft (IDE surface)
+Surface: IDE
+Features: vibe (no spec; a write-up drafting task against the repo)
+What I asked for: draft the Devpost submission as docs/SUBMISSION.md, on the assumption judges never run the app, so
+this document and the README are the written submission. Part 1 a ~300-word project description (what NecroCard is,
+who it is for, the problem, the features, the live URL, category Resurrection); Part 2 ~1000 words answering the
+judges' prompts in order — surfaces, custom agents, hooks, spec-driven development, steering, MCP, property-based
+testing, Kiro powers — each sourced from this log, the brief, the README, .kiro/ and the test suites, with no tool
+named but Kiro and no invented facts. Then this log entry.
+What Kiro did: read KIRO_USAGE.md in full, docs/BRIEF.md, README.md, the five steering docs, the three hook JSON
+files, the necrotalk-reviewer agent, and .kiro/settings/mcp.json. Counted the Surface field of every entry directly
+from the file: 41 dated entries, 39 CLI, 1 Web, 1 "none yet", 0 IDE, 0 Crew — so the draft states Crew was not used
+and this is the first IDE entry. Confirmed no Kiro power was ever used (the word "powers" appears only in this log's
+header template and in the agent's includePowers: false). Wrote docs/SUBMISSION.md with the two parts, kept a marked
+"[author's own notes on IDE vs CLI]" placeholder, and used "as of 2026-11-05" rather than "final" or "last".
+What changed because of it (time saved, bug caught, decision made): this IDE session differs from the CLI sessions
+in the same way the Web session did — it did no spec execution, no test run, and no Playwright MCP run; it only read
+the repository and wrote two documentation files. It differs from the 2026-11-05 Web session in that it had no npm
+registry failure to work around and its job was authoring the submission document rather than reviewing the README.
+Like the Web session, it verified claims against the repo on disk (entry counts, the three hook files, the agent
+config, the MCP config, the conditional-steering fileMatch patterns) rather than from a live suite run in-session;
+the 1079 unit / 29 e2e totals quoted in the README come from the out-of-session run on commit f2790a0, not from this
+session. Scope was docs/SUBMISSION.md (new) and this KIRO_USAGE.md entry only; no code, tests, or other files
+touched, and no tool other than Kiro is named.
