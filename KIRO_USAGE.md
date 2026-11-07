@@ -1043,3 +1043,36 @@ the class and the computed colour. Added one sentence to REQ-1.4 and the matchin
 What changed because of it (time saved, bug caught, decision made): the "Screenshots stay current" rule limited the
 retake to one shot, 07, because the info style shows only after a share link opens. Defaulting the new tone to
 'error' kept the change to one call site instead of touching every status message in the editor and runtime.
+
+## 2026-11-06 - Edit toggle flake: re-check the fix against current Playwright docs with the Context7 power
+Surface: CLI
+Features: power, mcp
+What I asked for: an earlier session, interrupted by a restart, fixed a flake in retro-skin.spec.ts (1 failed / 99
+passed with --repeat-each=20: an Edit click before the first stack loaded was dropped and the mode stayed "browse").
+In that session the Context7 power's server was not connected, so the fix was checked against playwright.dev instead.
+This session redid the lookups with the Context7 power, compared them with the fix, listed fixed timeouts in
+test/e2e/, proved the fix, and pinned the Playwright MCP version.
+What Kiro did: activated the Context7 power, confirmed both tools (resolve-library-id, query-docs) and resolved
+Playwright to /websites/playwright_dev. Four lookups: (1) locator.click: it waits for actionability checks, and
+"force" skips the checks and "trial" runs only the checks; (2) auto-waiting: click needs the element to be
+visible, stable, receiving events and enabled; (3) web-first assertions: toBeVisible, toHaveAttribute, toHaveClass
+and toBeEnabled all retry until the assertion timeout; (4) expect.poll and expect.toPass as the retrying
+alternatives to a fixed wait. Comparison: the docs confirm the fix. click() already waits for "enabled", but the Edit
+toggle was never disabled before the first load, so that wait passed at once and the app dropped the click. Keeping it
+disabled until runtime.currentStack is set makes Playwright's own auto-wait do the job. openSample uses retrying
+assertions (toHaveAttribute, toBeEnabled), no fixed waits. Nothing in the fix or helper was changed. Fixed waits
+found in test/e2e/: two waitForTimeout(700) in stack-library.spec.ts (lines 25 and 130), waiting past the 500 ms save
+debounce. Not changed in this task. The Context7 lookup returned expect.poll / expect.toPass as the retrying
+replacements, polling for the saved state instead of sleeping; it did not return an explicit "discouraged" sentence
+for waitForTimeout. Other timeout values in the folder are assertion or action timeouts (browse.spec.ts:84,
+edit-background.spec.ts:39-40, script-editor.spec.ts:26/35/121), which are not fixed sleeps. Proof: retro-skin.spec.ts
+with --repeat-each=20 gave 100 passed, 0 failed; npm run check clean; npm test 74 files / 1089 tests passed; npm run
+e2e 30 passed. The power is installed per user, so it does not appear in the repo's .kiro/ folder. No gallery shot
+changes: the toggle is disabled only before the first load, and every shot is taken after a stack is shown. The
+@playwright/mcp entry in .kiro/settings/mcp.json was moved from @latest to the exact npm version 0.0.84, to be pasted
+in by hand because that folder is not writable from the session.
+What changed because of it (time saved, bug caught, decision made): the flake is now explained from current docs
+rather than from a page fetched while the power was down, and the decision not to touch the fix is backed by them. It
+also explains the "three retro-skin failures at the Edit toggle" mentioned at the end of the earlier polish-pass
+entry (the one headed "Polish pass before the video"): those were this same race. A follow-up, replacing the two
+fixed 700 ms waits with a retrying check, is open.

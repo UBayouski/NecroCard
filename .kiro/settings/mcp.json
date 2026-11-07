@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "playwright": {
-      "command": "cmd",
-      "args": ["/c", "npx", "-y", "@playwright/mcp@latest"],
+      "command": "cmd",                                                                                                                                                                  
+      "args": ["/c", "npx", "-y", "@playwright/mcp@0.0.84"], 
       "disabled": false,
       "autoApprove": ["browser_navigate", "browser_take_screenshot"]
     }

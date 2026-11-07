@@ -30,6 +30,25 @@ async function addButtonWithScript(page: Page, script: string) {
   await inspector(page).getByLabel('Script', { exact: true }).fill(script);
 }
 
+test('the Edit toggle is disabled until the first stack has loaded, then switches on the first click', async ({ page }) => {
+  // Hold the quiz fixture's module request so the "nothing loaded yet" window is long and certain. Before the fix a
+  // click in this window was dropped (editor.enter() refuses with no stack) and the mode silently stayed Browse.
+  let release!: () => void;
+  const held = new Promise<void>(r => { release = r; });
+  await page.route(/\/fixtures\/quiz\.necrocard\.json/, async route => { await held; await route.continue(); });
+
+  await page.goto('/?stack=quiz');
+  await expect(surface(page)).toHaveAttribute('data-card-name', '');
+  await expect(surface(page)).toHaveAttribute('data-busy', 'false'); // the empty surface already says not busy
+  await expect(mode(page, 'Edit')).toBeDisabled();
+
+  release();
+  await expect(surface(page)).toHaveAttribute('data-card-name', 'Title');
+  await expect(mode(page, 'Edit')).toBeEnabled();
+  await mode(page, 'Edit').click();
+  await expect(surface(page)).toHaveAttribute('data-mode', 'edit');
+});
+
 test('quiz: add a button that goes next, switch to Browse, click it', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/?stack=quiz');

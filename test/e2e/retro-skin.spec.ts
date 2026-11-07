@@ -4,6 +4,19 @@ import { expect, test, type Page } from './apiMock.js';
 const surface = (page: Page) => page.getByRole('application', { name: 'HyperCard stack' });
 const messageBox = (page: Page) => page.getByRole('textbox', { name: 'Message box' });
 
+/**
+ * Open a sample and wait until its first card is really shown. data-busy is "false" on the empty surface before any
+ * stack loads, so it is not a load signal on its own: wait for the card name too, then for the Edit toggle, which
+ * stays disabled until a stack is loaded.
+ */
+async function openSample(page: Page, key: string, firstCard: string): Promise<void> {
+  await page.goto(`/?stack=${key}`);
+  await expect(surface(page)).toHaveAttribute('data-card-name', firstCard);
+  await expect(surface(page)).toHaveAttribute('data-busy', 'false');
+  await expect(page.getByRole('radio', { name: 'Edit', exact: true })).toBeEnabled();
+}
+
+const FIRST_CARD: Record<string, string> = { quiz: 'Title', adventure: 'Entrance', flashcards: 'Title' };
 interface FitRow {
   stack: string;
   card: string;
@@ -56,8 +69,7 @@ async function measureFields(page: Page, stackKey: string, rects: Record<string,
 test('every fixture field fits its rect at NecroField 16px on a 20px line', async ({ page }) => {
   const report: FitRow[] = [];
   for (const key of ['quiz', 'adventure', 'flashcards']) {
-    await page.goto(`/?stack=${key}`);
-    await expect(surface(page)).toHaveAttribute('data-busy', 'false');
+    await openSample(page, key, FIRST_CARD[key]);
     // Measure with the real bitmap face, never a fallback: wait for NecroField and confirm it is loaded and in use.
     const loaded = await page.evaluate(async () => {
       await document.fonts.load('16px "NecroField"', 'Aa');
@@ -94,8 +106,7 @@ test('every fixture field fits its rect at NecroField 16px on a 20px line', asyn
 const inspector = (page: Page) => page.getByRole('complementary', { name: 'Inspector' });
 
 test('the script editor textarea and its mirror share identical font metrics, in NecroScript', async ({ page }) => {
-  await page.goto('/?stack=quiz');
-  await expect(surface(page)).toHaveAttribute('data-busy', 'false');
+  await openSample(page, 'quiz', 'Title');
   await page.getByRole('radio', { name: 'Edit', exact: true }).click();
   await expect(surface(page)).toHaveAttribute('data-mode', 'edit');
   await surface(page).locator('[data-object-name="BeginButton"]').dblclick({ force: true });
@@ -139,8 +150,7 @@ test('the script editor textarea and its mirror share identical font metrics, in
 });
 
 test('the card, chrome and editor really use the bundled fonts, at their native sizes', async ({ page }) => {
-  await page.goto('/?stack=quiz');
-  await expect(surface(page)).toHaveAttribute('data-busy', 'false');
+  await openSample(page, 'quiz', 'Title');
   // document.fonts.check is vacuously true for a family nobody declared, so load each face first and confirm it loaded.
   const status = await page.evaluate(async () => {
     await Promise.all([
@@ -183,8 +193,7 @@ test('the card, chrome and editor really use the bundled fonts, at their native 
 });
 
 test('a scrolling field with overflowing text shows its 50% dither track and thumb as soon as the card is shown', async ({ page }) => {
-  await page.goto('/?stack=quiz');
-  await expect(surface(page)).toHaveAttribute('data-busy', 'false');
+  await openSample(page, 'quiz', 'Title');
   await page.getByRole('radio', { name: 'Edit', exact: true }).click();
   await expect(surface(page)).toHaveAttribute('data-mode', 'edit');
   await page.getByRole('button', { name: 'Add field', exact: true }).click();

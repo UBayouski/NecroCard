@@ -142,7 +142,8 @@ function boot(root: HTMLElement): void {
     summonButton.disabled = busy;
     shareButton.disabled = busy;
     deleteControl.setEnabled(openTarget.kind === 'entry' && !busy);
-    toggle.setDisabled(busy);
+    // Edit needs a loaded stack: before the first load finishes, a click would be dropped (editor.enter() refuses).
+    toggle.setDisabled(busy || !runtime.currentStack);
     messageBox.disabled = busy || editor.mode === 'edit';
   };
 
@@ -344,6 +345,7 @@ function boot(root: HTMLElement): void {
   root.replaceChildren(toolbar, editToolbarHost, workspace, statusEl, messageBoxInput.el);
   stage.observe();
   refreshPicker();
+  updateToolbar(); // the mode toggle starts disabled until the first stack loads
 
   // Initial load (REQ-5.1): share fragment, then ?stack=, then the last-open stack, then the quiz.
   const initial = chooseInitialLoad(location, { storage: libraryStorage });
