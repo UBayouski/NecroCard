@@ -140,8 +140,10 @@ passes `"The Haunted Quiz (your copy)"`, collides, and becomes `"The Haunted Qui
 
 An entry's `name` is **derived from `stack.name`** (there is no separate library-only name; see §5). `create` sets
 `name = resolveName(requestedBase)`, where `requestedBase` is `stack.name` normally, or `"<stack.name> (your copy)"`
-for a fork or migration. `save` re-derives it only when the new body's `stack.name` differs from the previously
-saved body's `stack.name` (below).
+for a fork or migration, or `sharedName(stack.name, takenNames)` for a share link or Import, which returns
+`stack.name` when it is free and otherwise `resolveName("<stack.name> (shared)", takenNames)`, where `takenNames` is
+the three sample names plus the current entry names. `save` re-derives it only when the new body's `stack.name`
+differs from the previously saved body's `stack.name` (below).
 
 ### 2.5 Create / save / delete (REQ-1.3, REQ-1.5)
 

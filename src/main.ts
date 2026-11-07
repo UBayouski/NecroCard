@@ -10,7 +10,8 @@ import './ui/share/share.css';
 import { loadFixture, type FixtureName } from './model/fixtures.js';
 import type { Stack } from './model/types.js';
 import { CardStage } from './ui/browse/stage.js';
-import { BrowseRuntime, type StatusLine } from './ui/browse/runtime.js';
+import { BrowseRuntime } from './ui/browse/runtime.js';
+import { createStatusLine } from './ui/browse/statusLine.js';
 import {
   createStackPicker, FIXTURES, urlWithFixture, type PickerChoice,
 } from './ui/browse/stackPicker.js';
@@ -92,13 +93,8 @@ function boot(root: HTMLElement): void {
   workspace.className = 'workspace';
   workspace.append(stage.viewport);
 
-  const statusEl = document.createElement('div');
-  statusEl.className = 'status-line';
-  statusEl.setAttribute('role', 'alert');
-  const status: StatusLine = {
-    show: message => { statusEl.textContent = message; },
-    clear: () => { statusEl.textContent = ''; },
-  };
+  const status = createStatusLine();
+  const statusEl = status.el;
 
   const messageBoxInput = new MessageBoxInput();
   const messageBox = messageBoxInput.input;
@@ -341,7 +337,7 @@ function boot(root: HTMLElement): void {
     // Clear the fragment first so a reload falls through to the last-open entry (this new one).
     history.replaceState(null, '', `${location.origin}${location.pathname}`);
     await createEntryInEdit(stack, false, true);
-    if (statusEl.textContent === '') status.show(SHARED_OPENED_MESSAGE); // keep a real problem (library full) visible
+    if (statusEl.textContent === '') status.show(SHARED_OPENED_MESSAGE, 'info'); // keep a real problem (library full) visible
   }
 
   toolbar.append(title, picker.el, newStackButton, deleteControl.button, summonButton, shareButton, settingsButton, toggle.el);

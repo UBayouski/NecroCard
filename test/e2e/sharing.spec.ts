@@ -42,6 +42,9 @@ test('share: the URL opens the same stack in a second page, with the fragment cl
   expect(page2.url()).not.toContain('?');
   // A shared link says so in the status line, and the entry cannot repeat the bundled sample's name.
   await expect(page2.locator('.status-line')).toHaveText('Opened from a shared link');
+  // A neutral notice: the info style in the chrome text colour, not the error red.
+  await expect(page2.locator('.status-line')).toHaveClass(/status-line--info/);
+  await expect(page2.locator('.status-line')).toHaveCSS('color', 'rgb(26, 26, 26)');
   await expect(page2.locator('#stack-picker option:checked')).toHaveText('The Haunted Quiz (shared)');
   // The next action clears it like any other status message.
   await page2.getByRole('button', { name: 'Enter if you dare...' }).click();

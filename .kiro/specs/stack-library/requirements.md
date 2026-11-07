@@ -107,7 +107,10 @@ Acceptance criteria:
 
 When a new entry's requested name already exists in the library, a numeric suffix makes it unique: `<name> 2`,
 `<name> 3`, and so on. This is the same rule the first-edit fork uses for `<name> (your copy)` (REQ-2), so forking a
-sample twice yields `<name> (your copy)` then `<name> (your copy) 2`.
+sample twice yields `<name> (your copy)` then `<name> (your copy) 2`. A stack that arrives from outside (a share link
+or an Import) and whose name equals a bundled sample's name or an existing entry's name is requested as
+`<name> (shared)` instead, with the same numeric suffix on a further collision (`<name> (shared) 2`), so the picker
+never shows two identical names.
 
 Acceptance criteria:
 1. A requested name not already present is used unchanged.

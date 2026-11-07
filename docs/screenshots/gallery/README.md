@@ -13,7 +13,7 @@ cited by `KIRO_USAGE.md` and `docs/SUBMISSION.md` and are not part of this set.
 - `04-script-editor.png`: the expanded NecroTalk script editor on that button's real `mouseUp` script.
 - `05-summon.png`: a Summoned stack ("Haunted Candy") open in Browse mode with the counter at 3.
 - `06-library.png`: the stack library at work: three own stacks ("Ghost Recipes", "Crypt Notes", "Haunted Candy") in the library, with the closed picker showing "Haunted Candy" and its Delete confirmation open.
-- `07-share.png`: The Cursed Manor opened from a share link (`#s=...`) on a clean profile: the picker names it "The Cursed Manor (shared)" and the status line reads "Opened from a shared link".
+- `07-share.png`: The Cursed Manor opened from a share link (`#s=...`) on a clean profile: the picker names it "The Cursed Manor (shared)" and the status line reads "Opened from a shared link" in the neutral info style (dark chrome text, not the error red).
 - `summon-stack.json`: the stack Gemini produced for shot 05, saved once so the shot never needs another Gemini call.
 
 The Summon prompt that produced `summon-stack.json` was: "A haunted candy counter: a field showing candy count, a

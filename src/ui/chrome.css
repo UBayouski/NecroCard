@@ -115,6 +115,11 @@ body {
   line-height: var(--line-height-text);
 }
 
+/* A neutral notice (for example "Opened from a shared link"): plain chrome text, not the error red. */
+.status-line--info {
+  color: var(--chrome-fg);
+}
+
 /* Font metrics come from the shared code-metrics rule in script-editor.css. */
 .message-box {
   flex: 0 0 auto;

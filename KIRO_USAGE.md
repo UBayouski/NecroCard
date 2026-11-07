@@ -1027,3 +1027,19 @@ comment that called "no collision inside My stacks" fine: the picker showed "The
 that waited for file choosers inside a Playwright code block left stray choosers open, so the gallery README now says
 to use the MCP file-upload step. One first e2e run had three retro-skin failures at the Edit toggle; they did not
 recur on any later run.
+
+## 2026-11-06 - Status line info tone; the (shared) rule written into the stack-library spec
+Surface: CLI
+Features: spec, steering, mcp
+What I asked for: draw neutral notices such as "Opened from a shared link" in a neutral style instead of the error red,
+keep red for errors such as the library-full message, test both, and retake 07-share.png. Then record the " (shared)"
+naming rule in the stack-library requirements and design so the spec matches sharedName.
+What Kiro did: moved the status line out of main.ts into src/ui/browse/statusLine.ts. Its show() takes an optional
+tone that defaults to 'error', so every existing caller keeps the red style without changes, and 'info' adds a
+status-line--info class in the chrome text colour. Only the share notice passes 'info'. Four unit tests cover the share
+notice (info), the quota message (error), switching back from info to error, and clear; the sharing e2e test checks
+the class and the computed colour. Added one sentence to REQ-1.4 and the matching sharedName line to design section
+2.4. Retook 07 per the gallery README and checked it: neutral dark text, picker "The Cursed Manor (shared)".
+What changed because of it (time saved, bug caught, decision made): the "Screenshots stay current" rule limited the
+retake to one shot, 07, because the info style shows only after a share link opens. Defaulting the new tone to
+'error' kept the change to one call site instead of touching every status message in the editor and runtime.
