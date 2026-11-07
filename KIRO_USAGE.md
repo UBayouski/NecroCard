@@ -1076,3 +1076,30 @@ rather than from a page fetched while the power was down, and the decision not t
 also explains the "three retro-skin failures at the Edit toggle" mentioned at the end of the earlier polish-pass
 entry (the one headed "Polish pass before the video"): those were this same race. A follow-up, replacing the two
 fixed 700 ms waits with a retrying check, is open.
+
+## 2026-11-07 - Replace the two fixed 700 ms waits in stack-library.spec.ts with retrying checks
+Surface: CLI
+Features: vibe
+What I asked for: close the follow-up left open by the entry "Edit toggle flake: re-check the fix against current
+Playwright docs with the Context7 power". Replace both page.waitForTimeout(700) calls (there to get past the 500 ms
+save debounce) with retrying checks, in test code only, nothing under src/.
+What Kiro did: read src/ui/browse/persist.ts and src/share/library.ts to see how a save lands: a 500 ms trailing
+debounce, then save() writes the entry body under 'necrocard.library.entry.<id>' first and the index
+('necrocard.library') second, and only a rename changes the index record's display name. In addLabelledButton the sleep
+became expect.poll over a small page.evaluate helper that reads the last-opened entry's stored body and waits until it
+holds a button with the new label, with a message saying what it waits for. In the rename test the window title
+follows the rename at once, but the picker label is rebuilt from the index, which changes only after the debounced
+save, so the existing retrying toHaveText on the picker label already waits for persistence; the sleep was simply
+removed, with a comment saying why. Both waits were checked by breaking them: polling for "LanternX" failed after 5 s
+with "the open library entry should be saved with a button labelled "Lantern"" (expected true, received false), and
+expecting "Midnight Manor X" failed with the picker going "Untitled" then "Midnight Manor", which shows the label is
+save-gated. Both breaks were reverted. Results: stack-library.spec.ts --repeat-each=20 gave 140 passed, 0 failed;
+npm run check clean; npm test 74 files / 1089 tests passed; npm run e2e 30 passed; no waitForTimeout is left in
+test/e2e/. Runtime: the whole file took 4.6 s before and 4.8 s after in a default parallel run (the longest test sets
+the wall time, so it did not move); the edit tests that used the helper took about 2.3 to 2.8 s each before and 1.7 to
+2.1 s each after in a one-worker run. The two conditions differ, so treat that as roughly 0.5 s saved per test, not a
+measured benchmark. src/ is untouched.
+What changed because of it (time saved, bug caught, decision made): the tests now wait for the real condition, so they
+neither over-wait nor pass on a slow machine by luck; a failure names the missing label. Decision: the rename test
+needed no storage poll because its existing assertion is already save-gated. This is test-only, so no gallery shot
+changes and none was retaken.

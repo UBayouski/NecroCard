@@ -22,7 +22,26 @@ async function addLabelledButton(page: Page, label: string) {
   await page.getByRole('button', { name: 'Add button', exact: true }).click();
   await inspector(page).getByLabel('Label', { exact: true }).fill(label);
   await inspector(page).getByLabel('Label', { exact: true }).blur();
-  await page.waitForTimeout(700); // past the 500 ms save debounce
+  // The edit is saved on a 500 ms trailing debounce (src/ui/browse/persist.ts). Poll the library in localStorage until
+  // the open entry's saved body holds the new label, so a stack switch right after cannot lose the edit.
+  await expect.poll(() => savedBodyHasLabel(page, label), {
+    message: `the open library entry should be saved with a button labelled "${label}"`,
+  }).toBe(true);
+}
+
+/** True once the last-opened library entry's stored body contains a button label equal to `label`. */
+function savedBodyHasLabel(page: Page, label: string): Promise<boolean> {
+  return page.evaluate((wanted: string) => {
+    // Keys from src/share/library.ts: INDEX_KEY and ENTRY_PREFIX.
+    const rawIndex = localStorage.getItem('necrocard.library');
+    if (rawIndex === null) return false;
+    const lastOpened = (JSON.parse(rawIndex) as { lastOpened: { kind: string; id?: string } | null }).lastOpened;
+    if (!lastOpened || lastOpened.kind !== 'entry' || !lastOpened.id) return false;
+    const rawBody = localStorage.getItem(`necrocard.library.entry.${lastOpened.id}`);
+    if (rawBody === null) return false;
+    // Re-stringify so the check does not depend on the stored JSON's whitespace.
+    return JSON.stringify(JSON.parse(rawBody)).includes(`"label":${JSON.stringify(wanted)}`);
+  }, label);
 }
 
 test('New Stack, edit, switch to a sample and back: the edit survives', async ({ page }) => {
@@ -127,8 +146,10 @@ test('renaming a New Stack in the inspector updates the picker label and the win
   // The card inspector (no object selected) holds the Stack name field.
   await inspector(page).getByLabel('Stack name', { exact: true }).fill('Midnight Manor');
   await inspector(page).getByLabel('Stack name', { exact: true }).blur();
-  await page.waitForTimeout(700);
 
+  // The window title follows the rename at once, but the picker label is rebuilt from the library index, which only
+  // changes when the debounced save writes the entry (body first, then index). So this retrying assertion also waits
+  // for persistence; no separate sleep or storage poll is needed.
   await expect(checkedLabel(page)).toHaveText('Midnight Manor');
   await expect(page.locator('.card-window-title-label')).toHaveText('Midnight Manor');
 });
