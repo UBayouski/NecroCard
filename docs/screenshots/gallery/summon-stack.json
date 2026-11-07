@@ -1,0 +1,149 @@
+{
+  "backgrounds": [
+    {
+      "id": "bg3Kq8w2",
+      "name": "BgMain",
+      "objects": [
+        {
+          "id": "fd1Sc0re1",
+          "lockText": true,
+          "name": "ScoreField",
+          "rect": {
+            "h": 30,
+            "w": 180,
+            "x": 300,
+            "y": 20
+          },
+          "script": "",
+          "style": "transparent",
+          "text": "0",
+          "type": "field",
+          "visible": true
+        },
+        {
+          "autoHilite": true,
+          "id": "bt1Add01",
+          "label": "Add Candy",
+          "name": "AddBtn",
+          "rect": {
+            "h": 35,
+            "w": 120,
+            "x": 40,
+            "y": 120
+          },
+          "script": "on mouseUp\n  put field \"ScoreField\" + 1 into field \"ScoreField\"\n  play \"c e g\"\nend mouseUp",
+          "style": "roundRect",
+          "type": "button",
+          "visible": true
+        },
+        {
+          "autoHilite": true,
+          "id": "bt2Res01",
+          "label": "Reset",
+          "name": "ResetBtn",
+          "rect": {
+            "h": 35,
+            "w": 120,
+            "x": 190,
+            "y": 120
+          },
+          "script": "on mouseUp\n  put 0 into field \"ScoreField\"\n  play \"g e c\"\nend mouseUp",
+          "style": "roundRect",
+          "type": "button",
+          "visible": true
+        },
+        {
+          "autoHilite": true,
+          "id": "bt3Nxt01",
+          "label": "Go Thanks",
+          "name": "NextBtn",
+          "rect": {
+            "h": 35,
+            "w": 120,
+            "x": 340,
+            "y": 120
+          },
+          "script": "on mouseUp\n  visual effect dissolve\n  go to card \"ThanksCard\"\nend mouseUp",
+          "style": "roundRect",
+          "type": "button",
+          "visible": true
+        }
+      ],
+      "script": ""
+    }
+  ],
+  "cards": [
+    {
+      "backgroundId": "bg3Kq8w2",
+      "id": "cd1Cnt01",
+      "name": "CounterCard",
+      "objects": [
+        {
+          "id": "fd2Tit01",
+          "lockText": true,
+          "name": "TitleField",
+          "rect": {
+            "h": 40,
+            "w": 240,
+            "x": 40,
+            "y": 30
+          },
+          "script": "",
+          "style": "transparent",
+          "text": "Haunted Candy Counter",
+          "type": "field",
+          "visible": true
+        }
+      ],
+      "script": ""
+    },
+    {
+      "backgroundId": "bg3Kq8w2",
+      "id": "cd2Thk01",
+      "name": "ThanksCard",
+      "objects": [
+        {
+          "id": "fd3Msg01",
+          "lockText": true,
+          "name": "ThanksField",
+          "rect": {
+            "h": 60,
+            "w": 390,
+            "x": 60,
+            "y": 120
+          },
+          "script": "",
+          "style": "transparent",
+          "text": "Thanks for visiting the haunted candy counter!",
+          "type": "field",
+          "visible": true
+        },
+        {
+          "autoHilite": true,
+          "id": "bt4Bck01",
+          "label": "Back",
+          "name": "BackBtn",
+          "rect": {
+            "h": 35,
+            "w": 120,
+            "x": 190,
+            "y": 220
+          },
+          "script": "on mouseUp\n  visual effect dissolve\n  go to card \"CounterCard\"\nend mouseUp",
+          "style": "roundRect",
+          "type": "button",
+          "visible": true
+        }
+      ],
+      "script": ""
+    }
+  ],
+  "id": "stk9X2m1",
+  "metadata": {
+    "author": "Summon",
+    "created": "2026-11-03T14:00:00.000Z",
+    "modified": "2026-11-03T14:00:00.000Z"
+  },
+  "name": "Haunted Candy",
+  "script": ""
+}

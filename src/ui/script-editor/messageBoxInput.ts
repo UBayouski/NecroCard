@@ -1,6 +1,9 @@
 import { LineHistory } from './lineHistory.js';
 import { renderLineMirror } from './mirror.js';
 
+/** Hint shown in the empty message box so the strip reads as a prompt, not a blank bar. */
+export const MESSAGE_BOX_PLACEHOLDER = 'Type a NecroTalk command and press Enter';
+
 /** History shared by every message box on the page (HyperCard's box is global; open question 10). */
 const sharedHistory = new LineHistory();
 
@@ -23,6 +26,7 @@ export class MessageBoxInput {
     this.input.type = 'text';
     this.input.className = 'message-box font-script';
     this.input.setAttribute('aria-label', 'Message box');
+    this.input.placeholder = MESSAGE_BOX_PLACEHOLDER;
     this.input.spellcheck = false;
     this.input.autocomplete = 'off';
     this.el.append(this.mirror, this.input);

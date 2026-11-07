@@ -40,6 +40,13 @@ test('share: the URL opens the same stack in a second page, with the fragment cl
   // openShared clears the fragment with replaceState once the stack has loaded.
   await page2.waitForFunction(() => location.hash === '');
   expect(page2.url()).not.toContain('?');
+  // A shared link says so in the status line, and the entry cannot repeat the bundled sample's name.
+  await expect(page2.locator('.status-line')).toHaveText('Opened from a shared link');
+  await expect(page2.locator('#stack-picker option:checked')).toHaveText('The Haunted Quiz (shared)');
+  // The next action clears it like any other status message.
+  await page2.getByRole('button', { name: 'Enter if you dare...' }).click();
+  await expect(surface(page2)).toHaveAttribute('data-card-name', 'Q1');
+  await expect(page2.locator('.status-line')).toHaveText('');
   expect(errors).toEqual([]);
   expect(errors2).toEqual([]);
 });
@@ -76,7 +83,9 @@ test('export: the download decodes to the open stack; import loads a file', asyn
 
   await expect(sharePanel(page)).toHaveCount(0);
   await expect(surface(page)).toHaveAttribute('data-mode', 'edit');
-  // Imported stacks become a library entry named after the stack (no collision inside "My stacks").
-  await expect(page.locator('#stack-picker option:checked')).toHaveText('The Haunted Quiz');
+  // Imported stacks become a library entry named after the stack; the name matches the bundled sample's, so it
+  // gets the " (shared)" suffix and the picker never shows two identical labels.
+  await expect(page.locator('#stack-picker option:checked')).toHaveText('The Haunted Quiz (shared)');
+  await expect(page.locator('#stack-picker option', { hasText: /^The Haunted Quiz$/ })).toHaveCount(1);
   expect(errors).toEqual([]);
 });

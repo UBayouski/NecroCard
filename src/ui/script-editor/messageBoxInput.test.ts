@@ -33,6 +33,13 @@ describe('MessageBoxInput', () => {
     expect(mirror().querySelector('.tok-comment')!.textContent).toBe('-- jump');
   });
 
+  it('shows a placeholder hint and keeps its accessible name', () => {
+    const { box } = setup();
+    expect(box.input.placeholder).toBe('Type a NecroTalk command and press Enter');
+    expect(box.input.getAttribute('aria-label')).toBe('Message box');
+    expect(box.value).toBe('');
+  });
+
   it('Up and Down walk the history; the caret goes to the end; the draft comes back', () => {
     const { box, key, type } = setup();
     box.submitted('beep');

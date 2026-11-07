@@ -5,7 +5,7 @@ import adventure from '../../fixtures/adventure.necrocard.json' with { type: 'js
 import flashcards from '../../fixtures/flashcards.necrocard.json' with { type: 'json' };
 import type { Stack } from '../model/types.js';
 import {
-  chooseInitialLoad, createLibrary, ENTRY_PREFIX, INDEX_KEY, LEGACY_AUTOSAVE_KEY, LIBRARY_VERSION, resolveName,
+  chooseInitialLoad, createLibrary, ENTRY_PREFIX, INDEX_KEY, LEGACY_AUTOSAVE_KEY, LIBRARY_VERSION, resolveName, sharedName,
   type LibraryDeps, type StorageLike,
 } from './library.js';
 
@@ -119,6 +119,43 @@ describe('resolveName', () => {
 // ---------------------------------------------------------------------------
 // Layout and operations
 // ---------------------------------------------------------------------------
+
+describe('sharedName', () => {
+  const SAMPLES = ['The Haunted Quiz', 'The Cursed Manor', 'Spooky Flashcards'];
+
+  it('leaves a name nobody uses as it is', () => {
+    expect(sharedName('Haunted Candy', SAMPLES)).toBe('Haunted Candy');
+  });
+
+  it('adds " (shared)" when the name equals a bundled sample name', () => {
+    expect(sharedName('The Cursed Manor', SAMPLES)).toBe('The Cursed Manor (shared)');
+  });
+
+  it('adds " (shared)" when the name equals an existing entry name', () => {
+    expect(sharedName('Haunted Candy', [...SAMPLES, 'Haunted Candy'])).toBe('Haunted Candy (shared)');
+  });
+
+  it('applies the numeric rule on a second collision', () => {
+    const taken = [...SAMPLES, 'The Cursed Manor (shared)'];
+    expect(sharedName('The Cursed Manor', taken)).toBe('The Cursed Manor (shared) 2');
+  });
+
+  it('creates entries whose names never repeat a sample or another entry', () => {
+    const { library } = makeLibrary();
+    const incoming = ['The Haunted Quiz', 'The Haunted Quiz', 'Crypt', 'Crypt', 'The Cursed Manor'];
+    for (const name of incoming) {
+      const taken = [...SAMPLES, ...library.list().map(r => r.name)];
+      expect(library.create(rename(QUIZ, name), sharedName(name, taken)).ok).toBe(true);
+    }
+    const names = library.list().map(r => r.name);
+    expect(new Set(names).size).toBe(names.length);
+    expect(names.some(n => SAMPLES.includes(n))).toBe(false);
+    expect(names).toContain('The Haunted Quiz (shared)');
+    expect(names).toContain('The Haunted Quiz (shared) 2');
+    expect(names).toContain('Crypt');
+    expect(names).toContain('Crypt (shared)');
+  });
+});
 
 describe('library layout and operations', () => {
   it('stores one index key with a version, and one body key per entry', () => {

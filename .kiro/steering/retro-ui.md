@@ -1,11 +1,11 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: "{src/ui/**,**/*.css}"
+fileMatchPattern: "{src/ui/**,**/*.css,index.html,public/**}"
 ---
 
 # NecroCard — Retro UI Steering
 
-This file is active whenever you work on files under `src/ui/` or any `.css` file. It defines the 1-bit
+This file is active whenever you work on files under `src/ui/`, `public/`, `index.html`, or any `.css` file. It defines the 1-bit
 Macintosh visual rules, font choices, rendering constraints, and CSS conventions for NecroCard.
 
 ## The prime directive
@@ -156,3 +156,12 @@ Cards are DOM. Transitions between cards are stepped DOM effects, not canvas ras
 - No system fonts on the card or in the UI chrome.
 - No CSS transitions for card navigation — DOM stepped effects only, no canvas rasterization of the card.
 - No `!important` except to reset UA stylesheet defaults.
+
+## Screenshots stay current
+
+The gallery in `docs/screenshots/gallery/` feeds the README and the Devpost gallery, so it must match the live build.
+
+- When a change alters what a user sees (layout, skin, fonts, dialogs, strings, sample stacks), the task report names
+  the affected gallery shots, and they are retaken per `docs/screenshots/gallery/README.md` before the work is done.
+- A change nobody sees (internals, tests, docs) needs no retake; say so in the task report.
+- After the last visible change before submission, retake all seven shots.

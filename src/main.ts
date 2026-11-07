@@ -12,7 +12,7 @@ import type { Stack } from './model/types.js';
 import { CardStage } from './ui/browse/stage.js';
 import { BrowseRuntime, type StatusLine } from './ui/browse/runtime.js';
 import {
-  createStackPicker, urlWithFixture, type PickerChoice,
+  createStackPicker, FIXTURES, urlWithFixture, type PickerChoice,
 } from './ui/browse/stackPicker.js';
 import { createDeleteControl } from './ui/browse/libraryControls.js';
 import { createPersist, type OpenTarget } from './ui/browse/persist.js';
@@ -28,8 +28,11 @@ import { createDirectTransport, KEY_STORAGE, testDirectKey } from './summon/dire
 import { createServerTransport } from './summon/serverTransport.js';
 import type { Transport } from './summon/transport.js';
 import { createWakeState } from './summon/wake.js';
-import { chooseInitialLoad, createLibrary, DEFAULT_FIXTURE, type StorageLike } from './share/library.js';
+import { chooseInitialLoad, createLibrary, DEFAULT_FIXTURE, sharedName, type StorageLike } from './share/library.js';
 import { decodeStack } from './share/codec.js';
+
+/** One line in the status line when a stack opens from a share link; the next action clears it like any status. */
+const SHARED_OPENED_MESSAGE = 'Opened from a shared link';
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -246,10 +249,14 @@ function boot(root: HTMLElement): void {
     return choice.kind === 'fixture' ? loadFixtureKey(choice.key) : openEntry(choice.id);
   }
 
-  /** Create a library entry from a stack and open it in Edit mode (Summon, Import, New Stack). */
-  async function createEntryInEdit(stack: Stack, enterEdit: boolean): Promise<void> {
+  /**
+   * Create a library entry from a stack and open it in Edit mode (Summon, Import, New Stack). A stack that comes
+   * from outside (share link, imported file) is named with sharedName, so the picker never shows a repeat.
+   */
+  async function createEntryInEdit(stack: Stack, enterEdit: boolean, fromOutside = false): Promise<void> {
     if (!(await loadStack(stack))) throw new Error('A script is still running. Try again when it finishes.');
-    const r = library.create(stack, stack.name);
+    const taken = [...FIXTURES.map(f => f.name), ...library.list().map(r => r.name)];
+    const r = library.create(stack, fromOutside ? sharedName(stack.name, taken) : stack.name);
     if (!r.ok) {
       status.show('Your library is full; that stack was not saved.');
       openTarget = { kind: 'sample' }; // nothing persisted; treat as unsaved
@@ -301,7 +308,7 @@ function boot(root: HTMLElement): void {
       if (!s) throw new Error('No stack is loaded');
       return s;
     },
-    onImported: stack => createEntryInEdit(stack, true),
+    onImported: stack => createEntryInEdit(stack, true, true),
   });
   summonButton.addEventListener('click', () => { if (!runtime.isBusy) summonDialog.open(); });
   settingsButton.addEventListener('click', () => settingsDialog.open());
@@ -333,7 +340,8 @@ function boot(root: HTMLElement): void {
     }
     // Clear the fragment first so a reload falls through to the last-open entry (this new one).
     history.replaceState(null, '', `${location.origin}${location.pathname}`);
-    await createEntryInEdit(stack, false);
+    await createEntryInEdit(stack, false, true);
+    if (statusEl.textContent === '') status.show(SHARED_OPENED_MESSAGE); // keep a real problem (library full) visible
   }
 
   toolbar.append(title, picker.el, newStackButton, deleteControl.button, summonButton, shareButton, settingsButton, toggle.el);

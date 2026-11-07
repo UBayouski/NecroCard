@@ -309,6 +309,16 @@
   color: transparent;
 }
 
+/* The hint is flat muted text in the script font (no opacity effect); it hides while the box is disabled. */
+.message-box-wrap .message-box::placeholder {
+  color: var(--chrome-muted);
+  opacity: 1;
+}
+
+.message-box-wrap .message-box:disabled::placeholder {
+  color: transparent;
+}
+
 .message-box-wrap .message-box::selection {
   /* Translucent so the highlighted mirror text shows through the selection. */
   background: rgba(201, 211, 238, 0.55);

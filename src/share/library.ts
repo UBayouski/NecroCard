@@ -227,6 +227,17 @@ export function forkName(stackName: string): string {
 }
 
 /**
+ * The display base for a stack that arrives from outside (a share link or an imported file). A name nobody else
+ * uses stays as it is; one that matches a bundled sample or an existing entry becomes `<name> (shared)`, and the
+ * library's own numeric rule (REQ-1.4) then handles a second collision: `<name> (shared) 2`. `takenNames` is the
+ * picker's sample names plus the library's entry names, so the picker never shows two identical labels.
+ */
+export function sharedName(stackName: string, takenNames: Iterable<string>): string {
+  const taken = new Set(takenNames);
+  return taken.has(stackName) ? resolveName(`${stackName} (shared)`, taken) : stackName;
+}
+
+/**
  * Migrate a legacy single-autosave value into the library once, then remove the key. Runs whenever the key
  * exists. A corrupt value is removed and reported. A quota failure keeps the key (data not lost) so it retries.
  * Returns whether the migrated value was corrupt.

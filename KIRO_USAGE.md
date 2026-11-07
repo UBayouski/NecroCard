@@ -947,6 +947,8 @@ the out-of-session run for the case totals. The review caught two stale statemen
 split-deployment env-var sentence and the write-up placeholder) and corrected the quick start to match how a judge
 would actually clone and run the repo. Scope was README.md and KIRO_USAGE.md only; no code, tests, or other files
 touched, and no tool other than Kiro is named.
+Update 2026-11-06: the submission text was moved out of the repo into the hackathon package folder, since it is
+pasted into Devpost rather than read from GitHub; docs/SUBMISSION.md no longer exists in the repo.
 
 ## 2026-11-05 — Devpost submission draft (IDE surface)
 Surface: IDE
@@ -972,3 +974,56 @@ config, the MCP config, the conditional-steering fileMatch patterns) rather than
 the 1079 unit / 29 e2e totals quoted in the README come from the out-of-session run on commit f2790a0, not from this
 session. Scope was docs/SUBMISSION.md (new) and this KIRO_USAGE.md entry only; no code, tests, or other files
 touched, and no tool other than Kiro is named.
+Update 2026-11-06: the submission text was moved out of the repo into the hackathon package folder, since it is
+pasted into Devpost rather than read from GitHub; docs/SUBMISSION.md no longer exists in the repo.
+
+## 2026-11-06 - Curated screenshot gallery, a rule to keep it current, README hero
+Surface: CLI
+Features: mcp, steering
+What I asked for: a reproducible set of seven 1280 by 1024 screenshots in docs/screenshots/gallery/ taken with the
+Playwright MCP server against the local dev server from a clean browser profile, a gallery README with exact retake
+steps, a steering rule that keeps the gallery current, and the shots wired into the README.
+What Kiro did: drove the browser through Playwright MCP (browser_resize, browser_evaluate to clear localStorage,
+browser_click, browser_file_upload, browser_take_screenshot) and saved 01-title through 07-share. It found that port
+5173 was held by another project's dev server, so it started NecroCard's own on 5174 and documented "use the port Vite
+prints". Summon worked with the local Gemini key; the generated stack was saved once as summon-stack.json and shot 05
+was taken by importing that file through Share and Import, so retakes need no Gemini call. A native select's popup
+cannot be photographed, so shot 06 first expanded the picker in place with temporary styles; a follow-up retook it
+as real, unstyled UI instead: three own stacks made through Import and New Stack plus an inspector rename, captured
+at the Delete confirmation with the closed picker showing the stack name. Kiro then widened the retro-ui.md fileMatchPattern to cover index.html and public/**, added the
+"Screenshots stay current" section, added the hero and a Screenshots section to the README, and listed the visual
+problems it saw in the images without fixing any.
+What changed because of it (time saved, bug caught, decision made): the gallery can be rebuilt by a later session from
+the README alone, and any change to what a user sees now has to name the shots it affects. Two things went wrong on the
+way: a click on a card object in Edit mode times out because the card layer is inert there (a real mouse click at page
+coordinates works), and a scripted double import left two stray file choosers open that had to be cleared before the
+page responded. The browser image reads also showed that the message box strip at the bottom of every shot is an
+unlabeled blank bar.
+
+## 2026-11-06 - Polish pass before the video: message box hint, composed samples, (shared) names, share status
+Surface: CLI
+Features: steering, mcp
+What I asked for: five small fixes, with a test wherever there was code: a placeholder and aria-label for the blank
+message box; a composed title card for The Haunted Quiz; the stack-library collision rule (REQ-1.4) with a
+" (shared)" suffix for share-link and file imports, so the picker never shows two identical names; rebalanced sample
+cards that left most of the card empty, by moving and resizing existing objects only; and a one-line "Opened from a
+shared link" status message. Then, per the "Screenshots stay current" rule, name the affected gallery shots and
+retake them.
+What Kiro did: gave the message box the hint "Type a NecroTalk command and press Enter" in the muted chrome grey,
+hidden while the box is disabled, keeping the existing "Message box" aria-label (unit test). Centred the quiz title
+field over a larger centred roundRect button. Added sharedName() next to forkName() in src/share/library.ts: a name
+that matches a sample or an entry becomes "<name> (shared)", and the existing numeric rule handles a second
+collision. main.ts applies it to share links and Import only, not to Summon or New Stack (five unit tests, two e2e
+assertions). Moved and resized objects in all three samples: the quiz questions, Results and Title; every Cursed Manor
+card; the flashcards Title and End cards. The flashcard question cards were already full and were left alone.
+summon-stack.json was not touched. The share open path shows the status message only when the status line is empty,
+so a "library full" warning is not hidden, and the next action clears it like any other status (e2e). The rule
+pointed at all seven shots: the message box hint shows in every Browse shot, the samples changed 01, 02, 03, 04 and
+07, and 07 also gained the status line and the "(shared)" name. All seven were retaken and viewed.
+What changed because of it (time saved, bug caught, decision made): the "Screenshots stay current" rule did its job
+on its first real use. The report has to name the affected shots, which showed that one CSS hint touched the whole
+gallery, so all seven were retaken in one pass rather than patched. The share link change also corrected an old e2e
+comment that called "no collision inside My stacks" fine: the picker showed "The Haunted Quiz" twice. A retake script
+that waited for file choosers inside a Playwright code block left stray choosers open, so the gallery README now says
+to use the MCP file-upload step. One first e2e run had three retro-skin failures at the Edit toggle; they did not
+recur on any later run.

@@ -7,6 +7,8 @@ Built for **Kiroween 2026**, category **Resurrection**, with [Kiro](https://kiro
 
 > Live at **[necrocard.onrender.com](https://necrocard.onrender.com)**.
 
+![The Haunted Quiz in Browse mode: a question field and three answer buttons on a 1-bit Macintosh card](docs/screenshots/gallery/02-browse.png)
+
 ## What it is
 
 HyperCard (1987 to 2004) let anyone build interactive software by stacking cards, dropping buttons and fields onto
@@ -16,6 +18,26 @@ has properties and a script. Scripts are written in **NecroTalk**, a frozen subs
 navigation, `put`/`get`/`set`, `if`/`repeat`, `answer`/`ask`, visual effects, and a one-voice `play`. The one thing
 1987 did not have is **Summon**: type a description and an agent writes a working stack, scripts included, which you
 can then click through, edit, or ask the agent to explain and fix.
+
+## Screenshots
+
+![The title card of The Haunted Quiz, the default stack](docs/screenshots/gallery/01-title.png)
+
+The default stack opens on its title card, drawn in 1-bit black and white at the original Mac size.
+
+![Edit mode with the "B) October" button selected and its inspector open](docs/screenshots/gallery/03-edit-mode.png)
+
+Edit mode: select, move, and resize objects, and change their properties in the inspector.
+
+![The NecroTalk script editor open on a button's mouseUp script](docs/screenshots/gallery/04-script-editor.png)
+
+The script editor shows a real NecroTalk script with syntax colours and inline error checking.
+
+![A stack built by Summon from a one-sentence description, open in Browse mode](docs/screenshots/gallery/05-summon.png)
+
+A stack Summoned from a short plain-English prompt, with working buttons and a live counter field.
+
+All seven shots, and how to retake them, are in [`docs/screenshots/gallery/`](docs/screenshots/gallery/README.md).
 
 ## 60-second quick start
 
@@ -101,7 +123,8 @@ NecroCard was built with Kiro. Everything Kiro used lives in [`.kiro/`](.kiro/):
   necrotalk-interpreter, browse-mode, edit-mode, script-editor, summon, sharing, retro-skin, stack-library,
   edit-background, necrotalk-play, and single-service-hosting.
 - **5 steering docs** in [`.kiro/steering/`](.kiro/steering/) — product, tech, and structure always on, with
-  `necrotalk.md` and `retro-ui.md` scoped to their folders.
+  `necrotalk.md` and `retro-ui.md` scoped to their folders (`retro-ui.md` also holds the rule that keeps the
+  screenshot gallery current).
 - **3 hooks** in [`.kiro/hooks/`](.kiro/hooks/) — tests on save, typecheck and lint before finishing a task, and a
   task-done chime.
 - **1 custom agent** in [`.kiro/agents/`](.kiro/agents/) — the read-only `necrotalk-reviewer` that checks the
