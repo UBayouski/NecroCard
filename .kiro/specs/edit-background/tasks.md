@@ -9,7 +9,8 @@ References in brackets point at the design (§) and requirements (REQ-) sections
 
 ---
 
-- [ ] 1. Layer-aware commands (`commands.ts`) (REQ-5.1, REQ-5.2, design §3)
+- [x] 1. Layer-aware commands (`commands.ts`) (REQ-5.1, REQ-5.2, design §3)
+  - Done: `CommandTarget`, `containerObjects` and the "(background)" label in `src/ui/edit/commands.ts`; background cases and the missing-background throws-and-changes-nothing case in `commands.test.ts`; commit dacff7a (shared with necrotalk-play).
   - Add `export type CommandTarget = { kind: 'card'; cardId: string } | { kind: 'background'; backgroundId: string }`.
   - Replace `cardId` with `target: CommandTarget` on `setRect`, `setProp`, `addObject`, `removeObject`; change the
     object `ScriptOwner` variant to `{ kind: 'object'; target: CommandTarget; objectId: string }` (leave the
@@ -42,13 +43,15 @@ References in brackets point at the design (§) and requirements (REQ-) sections
     selection, and `activeObjects()` resolves against the new current card's background.
   - _Requirements: REQ-1.2, REQ-1.3, REQ-2.1, REQ-2.3, REQ-5.3, REQ-5.4_
 
-- [ ] 3. Overlay renders the active layer (`overlay.ts`) (REQ-2.2, design §4.2)
+- [x] 3. Overlay renders the active layer (`overlay.ts`) (REQ-2.2, design §4.2)
+  - Done: `render(objects, selected)` in `src/ui/edit/overlay.ts`, `overlay.test.ts` and `editor.ts` updated to pass objects; commit dacff7a.
   - Change `render(card, selected)` to `render(objects: CardObject[], selected)`; draw the hidden-object dotted
     outlines from `objects`.
   - Update `overlay.test.ts` (if present) and every caller.
   - _Requirements: REQ-2.2_
 
-- [ ] 4. Hit testing, Tab and the toggle plumbing (`editorInput.ts`, `editor.ts`) (REQ-1.1, REQ-2.1, REQ-4.2, design §4)
+- [x] 4. Hit testing, Tab and the toggle plumbing (`editorInput.ts`, `editor.ts`) (REQ-1.1, REQ-2.1, REQ-4.2, design §4)
+  - Done: `activeObjects()` hit testing, drag-cancel and the Ctrl+B/Cmd+B branch (returns early in text controls) in `editorInput.ts`; `toggleBackground()` and `refresh()` in `editor.ts`; the Ctrl+B unit test in `editor.test.ts`; commit dacff7a.
   - `editorInput`: replace `card().objects` with `ctrl.session!.activeObjects()` for `hitTest` (pointerdown and
     double-click) and Tab/Shift+Tab cycling; expose a drag-cancel the controller can call.
   - Add the `Ctrl+B` / `⌘B` branch to the keydown handler: return early (no `preventDefault`) when not in Edit mode
@@ -59,7 +62,8 @@ References in brackets point at the design (§) and requirements (REQ-) sections
     `onChange`.
   - _Requirements: REQ-1.1, REQ-2.1, REQ-4.2_
 
-- [ ] 5. Card menu item and the indicator wiring (`cardMenu.ts`, `editToolbar.ts`, `editor.ts`, `stage.ts`) (REQ-1.1, REQ-3.2, design §5.1, §5.3)
+- [x] 5. Card menu item and the indicator wiring (`cardMenu.ts`, `editToolbar.ts`, `editor.ts`, `stage.ts`) (REQ-1.1, REQ-3.2, design §5.1, §5.3)
+  - Done: `menuitemcheckbox` with the `Ctrl+B` hint span and `setEditBackground` in `cardMenu.ts`; `EditToolbarActions extends CardMenuActions` in `editToolbar.ts`; `setEditingBackground` in `stage.ts` (`setTitle` only writes the label text); `updateBackgroundIndicator()` in `editor.ts`; commit dacff7a.
   - `cardMenu`: add a `role="menuitemcheckbox"` "Edit Background" item with a CSS-drawn check, a right-aligned
     non-focusable `Ctrl+B` hint span, an `editBackground` action, and `setEditBackground(on)` toggling
     `aria-checked`.
@@ -70,7 +74,8 @@ References in brackets point at the design (§) and requirements (REQ-) sections
     from `toggleBackground`, `enter` (off) and `exit` (off).
   - _Requirements: REQ-1.1, REQ-3.2_
 
-- [ ] 6. The striped title bar and menu styling (`chrome.css`, `edit.css`) (REQ-3.1, design §5.3)
+- [x] 6. The striped title bar and menu styling (`chrome.css`, `edit.css`) (REQ-3.1, design §5.3)
+  - Done: `.card-window-title--editing-bg` 45° `repeating-linear-gradient` in `chrome.css`; `.card-menu-check` and `.card-menu-hint` in `edit.css`; card-surface CSS guard (`cardSurface.test.ts`) passes in the 1089-test `npm test` run; commit dacff7a.
   - Add the `.card-window-title--editing-bg` 45° `repeating-linear-gradient` stripe (chrome only; keep the label's
     solid background so the name stays readable); style the menu check and the shortcut hint.
   - Confirm no rule scoped to `.card-surface` is added; the card-surface CSS guard stays green.
@@ -87,13 +92,15 @@ References in brackets point at the design (§) and requirements (REQ-) sections
     duplicate-name warning still spans card + background with the background active (REQ-5.4).
   - _Requirements: REQ-6.1, REQ-5.4_
 
-- [ ] 8. Property test across both layers (`session.test.ts` or the shared edit property file) (REQ-7.2, design §6.2)
+- [x] 8. Property test across both layers (`session.test.ts` or the shared edit property file) (REQ-7.2, design §6.2)
+  - Done: `session.test.ts` "random edits on either layer ... (200 runs)" picks a layer via `setLayer` per op, checks `validateStack` after each step, and compares `serializeStack` after undo-all and redo-all; commit dacff7a.
   - Extend the edit-mode "undo restores / redo replays" property: each random edit first picks a layer via
     `setLayer`, then applies a random edit on it; undoing all restores `serializeStack` byte-for-byte, redoing all
     reproduces it, and `validateStack` holds after every step. ≥ 200 runs, deterministic injected id gen.
   - _Requirements: REQ-7.2_
 
-- [ ] 9. End-to-end (`test/e2e/edit-background.spec.ts`) (REQ-7.3, design §6.4)
+- [x] 9. End-to-end (`test/e2e/edit-background.spec.ts`) (REQ-7.3, design §6.4)
+  - Done: `test/e2e/edit-background.spec.ts` follows the listed steps (flashcards, stripe and menu check, New Button on the background, Next, move, Prev, undo, toggle off); it passed in a full `npm run e2e` run (30 passed) together with `edit.spec.ts` and `browse.spec.ts`; commit dacff7a.
   - Open `/?stack=flashcards`, Edit, toggle Edit Background (assert the stripe and the menu check); New Button
     (lands on the background, selected); Card-menu Next → the button is on the next card; move it; back → moved;
     undo → restored; toggle off → the card's own Next is selectable and the new background button is not. Create the

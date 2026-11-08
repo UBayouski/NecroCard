@@ -9,14 +9,16 @@ References in brackets point at the design (§) and requirements (REQ-) sections
 
 ---
 
-- [ ] 1. Amend steering and the brief (REQ-10)
+- [x] 1. Amend steering and the brief (REQ-10)
+  - Done: `.kiro/steering/product.md` persistence section now describes the `localStorage` library; one line added under `docs/BRIEF.md` phase 2 item 0 naming spec `stack-library`; commit 510dcbd.
   - Edit `.kiro/steering/product.md` so the persistence section says the open stack and the person's other stacks
     are kept in a `localStorage` library (not a single autosave), in one or two short sentences. [REQ-10.1]
   - Add one short line under `docs/BRIEF.md` phase 2 item 0 noting that spec `stack-library` implements it.
   - Change no other steering rule; leave `structure.md`'s `src/share/` → `src/model/` boundary untouched.
   - _Requirements: REQ-10.1_
 
-- [ ] 2. Library model core: types, layout, create/open/list (REQ-1.1–1.4, design §2.1–2.5)
+- [x] 2. Library model core: types, layout, create/open/list (REQ-1.1–1.4, design §2.1–2.5)
+  - Done: `src/share/library.ts` exports the listed types, `LIBRARY_VERSION`, `createLibrary`, `resolveName`; it imports only `src/model/`; layout tests in `library.test.ts`; commit 510dcbd.
   - Create `src/share/library.ts` with `LibraryRecord`, `LibraryEntry`, `LastOpened`, `SaveResult`, `Library`,
     `LibraryDeps`, and `LIBRARY_VERSION = 1`. Import only `src/model/` (`Stack`, `serializeStack`, `validateStack`,
     `FixtureName`). [§2.1]
@@ -32,7 +34,8 @@ References in brackets point at the design (§) and requirements (REQ-) sections
   - Default `now = () => new Date().toISOString()`, `newId` = a short URL-safe random id independent of `stack.id`.
   - _Requirements: REQ-1.1, REQ-1.2, REQ-1.3, REQ-1.4, REQ-1.5_
 
-- [ ] 3. Library model: save (name re-derivation), delete, last-open (REQ-1.1 crit 3, REQ-1.3, REQ-4.2, design §2.5)
+- [x] 3. Library model: save (name re-derivation), delete, last-open (REQ-1.1 crit 3, REQ-1.3, REQ-4.2, design §2.5)
+  - Done: `save`, `delete`, `lastOpened` and `setLastOpened` in `library.ts`; covered by "save name re-derivation", "storage failure" and layout tests in `library.test.ts`; commit 510dcbd.
   - Implement `save(id, stack)`: `not-found` when the id is absent; else write the body (throw → `quota`), bump
     `updatedAt`, and re-derive the record name only when `stack.name` differs from the record's stored `stackName`
     (no body read), using `resolveName` against the other names, then set `stackName = stack.name`; same name →
@@ -42,7 +45,8 @@ References in brackets point at the design (§) and requirements (REQ-) sections
     ignored). [§2.2, §2.5, REQ-1.3]
   - _Requirements: REQ-1.1, REQ-1.3, REQ-4.2_
 
-- [ ] 4. `chooseInitialLoad` and legacy migration (REQ-5, design §2.6)
+- [x] 4. `chooseInitialLoad` and legacy migration (REQ-5, design §2.6)
+  - Done: `chooseInitialLoad` with the share, fixture, library and default sources plus `corruptAutosave`/`corruptIndex`, and `migrateLegacy` (module-private, called from `chooseInitialLoad`) in `library.ts`; `AUTOSAVE_KEY` moved as `LEGACY_AUTOSAVE_KEY`, with `FRAGMENT_PARAM` and `DEFAULT_FIXTURE`; `chooseInitialLoad` and legacy migration blocks in `library.test.ts`; commit 510dcbd.
   - Add `chooseInitialLoad(location, deps)` to `library.ts` returning a tagged source (`share` | `fixture` |
     `library` | `default`) plus `corruptAutosave` and `corruptIndex` flags, with the priority: share fragment →
     `?stack=` fixture (and `setLastOpened` the fixture) → last-open (entry if `open` succeeds, else fixture) →
@@ -54,7 +58,8 @@ References in brackets point at the design (§) and requirements (REQ-) sections
   - Move `AUTOSAVE_KEY`, `FRAGMENT_PARAM`, `DEFAULT_FIXTURE` here from `autosave.ts`. [§7.4]
   - _Requirements: REQ-5.1, REQ-5.3, REQ-5.4_
 
-- [ ] 5. Library unit and property tests (REQ-8.1, design §6.1)
+- [x] 5. Library unit and property tests (REQ-8.1, design §6.1)
+  - Done: `src/share/library.test.ts` has three fast-check properties at 100 runs each plus the layout, delete, quota, re-derivation, migration, corrupt-index and missing-body examples; included in the 1089-test `npm test` run; commit 510dcbd.
   - Create `src/share/library.test.ts` with a fake `StorageLike` (throwing-`setItem` variant for the quota case),
     an injected counter `newId` and a stepped `now`.
   - fast-check ≥ 100: `create`→`open` deep-equals and name is collision-resolved; a sequence of colliding `create`s
@@ -66,7 +71,8 @@ References in brackets point at the design (§) and requirements (REQ-) sections
     non-empty library; a corrupt/unknown index reads empty; `open` of a missing body is `null`. [REQ-8.1]
   - _Requirements: REQ-1.6, REQ-8.1_
 
-- [ ] 6. Stack picker: two groups and the new API (REQ-6.1, design §4)
+- [x] 6. Stack picker: two groups and the new API (REQ-6.1, design §4)
+  - Done: `stackPicker.ts` has the "Samples" and "My stacks" optgroups, `setEntries`, `setDisabled` and `createStackPicker(onChoose)`; the old `customLabel`/`showCustom`/`UNTITLED`/`PickerValue` names are gone; the select-by-value method is named `setSelected` rather than `select`; `stackPicker.test.ts` covers the listed cases; commit 510dcbd.
   - Rework `src/ui/browse/stackPicker.ts`: a single `<select>` with a "Samples" `<optgroup>` (the three fixtures,
     unchanged) and a "My stacks" `<optgroup>` rebuilt from records (omitted when empty). [§4, REQ-6.1]
   - New API: `setEntries(records)`, `select(value)`, `setDisabled(disabled)`, and
@@ -78,7 +84,8 @@ References in brackets point at the design (§) and requirements (REQ-) sections
     Remove the obsolete `customLabel`/transient-entry tests. [REQ-8.1]
   - _Requirements: REQ-6.1, REQ-8.1_
 
-- [ ] 7. Delete button and confirm dialog (REQ-4.1, design §5)
+- [x] 7. Delete button and confirm dialog (REQ-4.1, design §5)
+  - Done: `src/ui/browse/libraryControls.ts` (Delete button and confirm on `createDialogShell`, named stack, Cancel/Escape) with `libraryControls.test.ts`; button placed in the `main.ts` toolbar and enabled only for an open entry when not busy; commit 510dcbd.
   - Create `src/ui/browse/libraryControls.ts` exporting the Delete `chromeButton` and a confirm built on
     `createDialogShell` (named stack, OK/Cancel, Escape → cancel). It takes callbacks for "is an entry open",
     "delete + reopen quiz", and the open entry's name. [§5, REQ-4.1]
@@ -87,7 +94,8 @@ References in brackets point at the design (§) and requirements (REQ-) sections
   - Add chrome CSS in `src/ui/chrome.css` only if the button needs it; add no `.card-surface` rule.
   - _Requirements: REQ-4.1_
 
-- [ ] 8. Persist module (`src/ui/browse/persist.ts`) + its unit test (REQ-2.2, REQ-3, design §3.2–3.3)
+- [x] 8. Persist module (`src/ui/browse/persist.ts`) + its unit test (REQ-2.2, REQ-3, design §3.2–3.3)
+  - Done: `persist.ts` (`createPersist` with `persist(kind)` and `flush()`, 500 ms trailing debounce, fork on a sample's authored edit) and `persist.test.ts` covering the listed cases; commit 510dcbd.
   - Create `src/ui/browse/persist.ts` exporting `createPersist(deps)` returning `{ persist(kind), flush() }`.
     Deps: the `Library`, a current-stack accessor, a `StatusLine`, open-target get/set callbacks, a drop-fixture-link
     callback, and a picker-rebuild callback. Imports `src/share/` and `src/model/` only.
@@ -100,7 +108,8 @@ References in brackets point at the design (§) and requirements (REQ-) sections
     browse-typing does nothing; a quota failure shows the message. [REQ-8.1]
   - _Requirements: REQ-2.2, REQ-3.1, REQ-3.2, REQ-3.3_
 
-- [ ] 9. Wire the library into `main.ts` (REQ-2, REQ-5, REQ-6.2, REQ-7, design §3)
+- [x] 9. Wire the library into `main.ts` (REQ-2, REQ-5, REQ-6.2, REQ-7, design §3)
+  - Done: `main.ts` builds the library on `libraryStorage`, holds `openTarget`, routes the three save signals and `pagehide`/`visibilitychange` through `persist`, loads via `chooseInitialLoad`, keeps `leaveFixtureLink`; `src/share/autosave.ts` and its test are deleted; commit 510dcbd.
   - Build the library with a throwing-`setItem` `libraryStorage` wrapper; keep `safeStorage` for the Summon/Settings
     key callers. [§3.1, Amendment 2]
   - Remove `createAutosave`/`autosave.*`; hold an `openTarget` (`sample` | `entry`) and build the persist module
@@ -123,7 +132,8 @@ References in brackets point at the design (§) and requirements (REQ-) sections
     export/import cases.
   - _Requirements: REQ-8.2_
 
-- [ ] 11. Library end-to-end tests (REQ-8.2, design §6.3)
+- [x] 11. Library end-to-end tests (REQ-8.2, design §6.3)
+  - Done: `test/e2e/stack-library.spec.ts` has the seven listed cases; it passed in a full `npm run e2e` run (30 passed); commit 510dcbd, with the two fixed waits later replaced by retrying checks in commit 446e923.
   - Create `test/e2e/stack-library.spec.ts`:
     1. New Stack → edit → switch to a sample → switch back → the edit is there.
     2. Edit an entry → reload bare URL → the last-open entry reopens with edits. [REQ-5.2]
