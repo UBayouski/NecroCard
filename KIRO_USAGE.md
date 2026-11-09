@@ -1103,3 +1103,32 @@ What changed because of it (time saved, bug caught, decision made): the tests no
 neither over-wait nor pass on a slow machine by luck; a failure names the missing label. Decision: the rename test
 needed no storage poll because its existing assertion is already save-gated. This is test-only, so no gallery shot
 changes and none was retaken.
+
+## 2026-11-08 - Task-list bookkeeping, second pass: seven open tasks closed with evidence
+Surface: CLI
+Features: spec, vibe
+What I asked for: finish the bookkeeping on the seven tasks the first pass left open (edit-background 2, 7 and 10;
+necrotalk-play 5 and 9; stack-library 10 and 12). Read-only first, then, on my decisions: add the five missing tests
+(test-only, no source changes, stop if any fails), record the over-300-line files as accepted exceptions without
+splitting, mark one superseded clause, skip new Playwright MCP runs in favour of the 2026-11-04 logged ones, run the
+build and server build, tick the tasks with Done lines, and log the pass.
+What Kiro did: read every sub-bullet of the seven tasks against the code, the tests and this log, and reported what
+was done and what was missing before touching anything. Then it added eight tests. In session.test.ts: a fresh
+session is on the card layer and showCard keeps whichever layer is active; toggling the layer clears the selection,
+is not a command and leaves revision unchanged; undoing a background command on the card layer selects nothing and
+keeps the layer; deleting a card on the background layer keeps the layer, clears the selection and resolves the new
+card's background (a two-background stack). In a new cardMenu.test.ts: aria-checked follows setEditBackground,
+choosing the item calls editBackground once, the Ctrl+B hint text. In playVoice.test.ts: the default beep does nothing
+before the first gesture and plays one 880 Hz square tone after it. All eight pass. The first run of cardMenu.test.ts
+failed with "document is not defined" because the new file lacked the happy-dom environment line the other DOM tests
+carry; adding that line to the test file fixed it, and no source file was changed. Then it ran npm run check, npm test
+(75 files, 1097 tests, up from 1089), npm run build and npm run server:build (both clean) and npm run e2e (30 passed),
+and ticked the seven tasks, each with a Done line naming files, tests and log entries.
+What changed because of it (time saved, bug caught, decision made): three of the seven needed real tests, which are
+now in, and the task lists match the code. Decisions recorded in the Done lines: no file was split, so edit-background
+10, necrotalk-play 9 and stack-library 12 carry the size exception (session.ts 342, edit.css 352, domHost.ts 313,
+main.ts 378, library.ts 318). domHost.ts crossed the guideline in the necrotalk-play spec and the 2026-11-04 entry
+did not say so; it is now stated. edit-background 2 notes that activeObjects() returns only the active layer (the
+overlay and hit-testing depend on it) and that the private getters are card and background, not activeCard.
+stack-library 10 notes that Browse field typing is covered only by persist.test.ts. necrotalk-play 5 notes that its
+tests live in playVoice.test.ts. No new Playwright run was made: the 2026-11-04 entries are the evidence.

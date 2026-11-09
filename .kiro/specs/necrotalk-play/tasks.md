@@ -54,7 +54,8 @@ References in brackets point at the design (§) and requirements (REQ-) sections
     line, no `play` call; a bad tempo → runtime error.
   - _Requirements: REQ-3.1, REQ-3.2, REQ-3.4, REQ-6.3_
 
-- [ ] 5. domHost voice + lifecycle stop + tests (REQ-4, REQ-3.3, REQ-6.4, design §5, §8.4)
+- [x] 5. domHost voice + lifecycle stop + tests (REQ-4, REQ-3.3, REQ-6.4, design §5, §8.4)
+  - Done: `src/ui/browse/domHost.ts` (one-time gesture listener :36-52, gain-first `stopSound` :87, `playNotes`), `runtime.ts:64`, `main.ts:151` and `:204`; the tests live in `src/ui/browse/playVoice.test.ts`, not `domHost.test.ts` (frequencies, tempo-spaced starts, replace, stop before a future note, pre-gesture no-op, and the default `beep` no-op before and sound after a gesture); commit dacff7a, `beep` test added in the 2026-11-07 pass.
   - `domHost.ts`: implement `play`/`stopSound`; a `Voice` list scheduled on the shared context; square wave at 0.1
     with attack/release and the 10 ms gap floored at half the note; `playNotes` calls `stopSound()` first
     (replace); `stopSound` silences through the **gain** (`cancelScheduledValues` + set 0 + disconnect), then
@@ -97,7 +98,8 @@ References in brackets point at the design (§) and requirements (REQ-) sections
   - Confirm `browse.spec.ts` and the other e2e still pass.
   - _Requirements: REQ-8.1_
 
-- [ ] 9. Full verification and the Playwright MCP run (REQ-8.2, design §8.7)
+- [x] 9. Full verification and the Playwright MCP run (REQ-8.2, design §8.7)
+  - Done: on 2026-11-07 `npm run check`, `npm test` (75 files, 1097 tests), `npm run build`, `npm run server:build` and `npm run e2e` (30 passed, including `play.spec.ts`) all passed; `src/ui/edit/` has no `play`/`stopSound`/`parseNotes` reference and `package.json` was not in commit dacff7a; the MCP run (four oscillators at 261.6/329.6/392.0/523.3 Hz, no AudioContext warning) and `localStorage` clear are logged in `KIRO_USAGE.md` entry "2026-11-04 - Spec 11: necrotalk-play". Exception, accepted without splitting: the "no file over ~300 lines" check is not met — `domHost.ts` is 313 lines after this spec and was not disclosed in the 2026-11-04 entry, which named only `parser.ts` and `evaluator.ts` (both long before this spec); `notes.ts` is 116.
   - Run the six checks; confirm the protected areas and `package.json` deps are unchanged and no file is over ~300
     lines.
   - One MCP run against the dev server (running on http://localhost:5173): open the quiz, click through to a right

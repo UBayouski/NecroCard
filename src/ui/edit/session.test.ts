@@ -151,6 +151,78 @@ describe('EditSession operations', () => {
     expect(state.stack.backgrounds[0].script).toBe('-- bg');
     expect(state.stack.script).toBe('-- stack');
   });
+
+  it('a fresh session is on the card layer, and showCard keeps whichever layer is active', () => {
+    const { s } = session(inline());
+    expect(s.activeLayer).toBe('card');
+    s.showCard(1);
+    expect(s.activeLayer).toBe('card');
+    s.setLayer('background');
+    s.showCard(0);
+    expect(s.activeLayer).toBe('background');
+  });
+
+  it('toggling the layer clears the selection, is not a command, and leaves revision unchanged', () => {
+    const { s } = session(inline());
+    const go = s.stack.cards[0].objects[0];
+    s.moveTo(go.id, { x: 20, y: 20, w: 50, h: 20 }, 'move'); // one real command, so revision is not zero
+    s.select(go.id);
+    expect(s.selection).toBe(go.id);
+    const revision = s.revision;
+    const size = s.history.size;
+
+    expect(s.toggleLayer()).toEqual({ render: true, select: null });
+    expect(s.activeLayer).toBe('background');
+    expect(s.selection).toBeNull();
+    expect(s.revision).toBe(revision);
+    expect(s.history.size).toBe(size);
+
+    s.toggleLayer();
+    expect(s.activeLayer).toBe('card');
+    expect(s.revision).toBe(revision);
+  });
+
+  it('undoing a background command while on the card layer selects nothing and keeps the layer', () => {
+    const { s } = session(inline());
+    const shared = s.stack.backgrounds[0].objects[0];
+    const before = structuredClone(shared.rect);
+    s.setLayer('background');
+    s.select(shared.id);
+    s.moveTo(shared.id, { x: 40, y: 50, w: 60, h: 20 }, 'move');
+    expect(s.selection).toBe(shared.id);
+
+    s.setLayer('card'); // back on the card layer; the background command stays in history
+    const event = s.undo();
+    expect(event).toMatchObject({ select: null, render: true });
+    expect(s.activeLayer).toBe('card'); // undo never changes the layer
+    expect(s.selection).toBeNull(); // the restored object is on the inactive layer
+    expect(s.stack.backgrounds[0].objects[0].rect).toEqual(before);
+  });
+
+  it('deleting a card on the background layer keeps the layer, clears the selection and resolves the new card\'s background', () => {
+    const sharedA = button('SharedA');
+    const sharedB = button('SharedB');
+    const bgA = background('A', [sharedA]);
+    const bgB = background('B', [sharedB]);
+    const stack = makeStack({
+      backgrounds: [bgA, bgB],
+      cards: [{ name: 'One', backgroundId: bgA.id }, { name: 'Two', backgroundId: bgB.id }],
+    });
+    const { s, state } = session(stack);
+    s.showCard(1); // card "Two", background B
+    s.setLayer('background');
+    s.select(sharedB.id);
+    expect(s.activeObjects().map(o => o.id)).toEqual([sharedB.id]);
+    expect(s.selection).toBe(sharedB.id);
+
+    const event = s.deleteCard();
+    expect(event).toEqual({ cardIndex: 0, select: null, render: true });
+    expect(state.cardIndex).toBe(0);
+    expect(s.activeLayer).toBe('background');
+    expect(s.selection).toBeNull();
+    // The current card is now "One", so the active objects come from background A.
+    expect(s.activeObjects().map(o => o.id)).toEqual([sharedA.id]);
+  });
 });
 
 // ---------------------------------------------------------------------------

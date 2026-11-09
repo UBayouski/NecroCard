@@ -144,6 +144,17 @@ describe('play voice', () => {
     expect(() => h.stopSound()).not.toThrow();
   });
 
+  it('the default beep is a no-op before the first gesture, then plays one square tone after it', async () => {
+    const h = await freshHost();
+    h.beep(); // no gesture: no context exists yet
+    expect(fake.oscillators).toHaveLength(0);
+    fireGesture();
+    h.beep();
+    expect(fake.oscillators).toHaveLength(1);
+    expect(fake.oscillators[0].type).toBe('square');
+    expect(fake.oscillators[0].frequency.value).toBe(880);
+  });
+
   it('is a no-op when AudioContext is unavailable', async () => {
     (globalThis as unknown as { AudioContext: unknown }).AudioContext = undefined;
     const h = await freshHost();

@@ -125,7 +125,8 @@ References in brackets point at the design (§) and requirements (REQ-) sections
   - Delete `src/share/autosave.ts` once nothing imports it; update any import of `AUTOSAVE_KEY`/`DEFAULT_FIXTURE`.
   - _Requirements: REQ-2.1, REQ-2.3, REQ-5.1, REQ-5.2, REQ-6.2, REQ-6.3, REQ-7.1, REQ-7.2_
 
-- [ ] 10. Trim the superseded `sharing` e2e (REQ-8.2 crit 8, design §6.5)
+- [x] 10. Trim the superseded `sharing` e2e (REQ-8.2 crit 8, design §6.5)
+  - Done: `test/e2e/sharing.spec.ts` has no `AUTOSAVE_KEY` import (imports :4-5) and keeps the share round-trip (:19) and export/import (:57); the removed single-autosave cases are covered by `stack-library.spec.ts:69` (edit and reload), `:101` (fork) and `:157` (play, reload, fresh); commit 510dcbd. Note: the removed "typing into an unlocked field in Browse is saved" case has no e2e replacement — Browse field typing is covered only by `persist.test.ts:70` and `:109`.
   - In `test/e2e/sharing.spec.ts` delete the `AUTOSAVE_KEY` import and the superseded cases: the single-autosave
     edit-survives-reload cases, the single-autosave fork, and "a visitor's own save survives following a link".
   - Keep the share round-trip (open a link in a second page, same first card, fragment cleared) and the
@@ -146,7 +147,8 @@ References in brackets point at the design (§) and requirements (REQ-) sections
     7. Play the quiz without an authored edit → reload → fresh, no entry created. [REQ-3.2]
   - _Requirements: REQ-8.2_
 
-- [ ] 12. Full verification and the Playwright MCP run (REQ-8.3, design §6.4)
+- [x] 12. Full verification and the Playwright MCP run (REQ-8.3, design §6.4)
+  - Done: on 2026-11-07 `npm run check`, `npm test` (75 files, 1097 tests), `npm run build`, `npm run server:build` and `npm run e2e` (30 passed, including `stack-library.spec.ts`) all passed, with the `src/share` boundary test and card-surface guard inside `npm test`; commit 510dcbd touched none of `src/interp`, `src/model`, `fixtures`, `src/summon`, `server/` or `package.json`; the MCP run, `docs/screenshots/library-picker.png`, `docs/screenshots/library-delete-confirm.png` and the `localStorage` clear are logged in `KIRO_USAGE.md` entry "2026-11-04 - Spec 9: stack-library". Exception, accepted without splitting: the "no file over ~300 lines" check is not met — `main.ts` 378 and `library.ts` 318 (the usage log flagged both on 2026-11-04).
   - Run the six checks; confirm the protected directories and `package.json` deps are unchanged, the `src/share`
     boundary test and the card-surface guard are green, and no file is over ~300 lines (split if needed).
   - One MCP run against the dev server (already running on http://localhost:5173): New Stack → edit → switch to a

@@ -24,7 +24,8 @@ References in brackets point at the design (§) and requirements (REQ-) sections
     `CommandError` and changes nothing. Keep the existing card-target cases.
   - _Requirements: REQ-5.1, REQ-5.2_
 
-- [ ] 2. The layer in the session (`session.ts`) (REQ-1.2, REQ-1.3, REQ-2, REQ-5.3, design §2)
+- [x] 2. The layer in the session (`session.ts`) (REQ-1.2, REQ-1.3, REQ-2, REQ-5.3, design §2)
+  - Done: `src/ui/edit/session.ts` (`Layer` :33, `activeLayer` :59, `container()` :62, `activeObjects()` :69, `setLayer` :72, `toggleLayer` :80, `focusOn` :296); `session.test.ts` tests for a fresh card layer kept across `showCard`, toggle clearing the selection with `revision` unchanged, undoing a background command on the card layer, deleting a card on the background layer, plus the 200-run layered property; `editor.test.ts:210` for the layer kept across navigation; commit dacff7a, tests added in the 2026-11-07 pass. Superseded: "`activeObjects()` is card then background" — it returns only the active layer, because the overlay and hit-testing depend on that; the getters are the private `card` and `background`, not `activeCard`.
   - Add `export type Layer = 'card' | 'background'`, a private `layer` (default `'card'`), `get activeLayer`,
     `setLayer(layer)` (seals history, clears selection, returns `{ render: true, select: null }`, does not bump
     `revision`) and `toggleLayer()`.
@@ -81,7 +82,8 @@ References in brackets point at the design (§) and requirements (REQ-) sections
   - Confirm no rule scoped to `.card-surface` is added; the card-surface CSS guard stays green.
   - _Requirements: REQ-3.1_
 
-- [ ] 7. Inspector follows the active layer, and happy-dom tests (`inspector.ts` if needed, `cardMenu.test.ts`, `editor.test.ts`/`inspector.test.ts`) (REQ-6.1, REQ-5.4, design §4.3, §6.3)
+- [x] 7. Inspector follows the active layer, and happy-dom tests (`inspector.ts` if needed, `cardMenu.test.ts`, `editor.test.ts`/`inspector.test.ts`) (REQ-6.1, REQ-5.4, design §4.3, §6.3)
+  - Done: `src/ui/edit/cardMenu.test.ts` (aria-checked follows `setEditBackground`, choosing the item calls `editBackground` once, `Ctrl+B` hint text); `editor.test.ts:162` (background button selectable with its inspector heading, card button not, stripe toggles), `:184` (menu check), `:198` (stripe survives a rename); `inspector.test.ts:150` (duplicate-name check spans card and background); commit dacff7a, `cardMenu.test.ts` added in the 2026-11-07 pass.
   - Confirm `Inspector.buildObject` renders a background object unchanged and that the controller's owners route to
     the background layer (no inspector logic change expected; verify).
   - `cardMenu.test.ts`: the menu renders a `menuitemcheckbox` "Edit Background" whose `aria-checked` follows
@@ -108,7 +110,8 @@ References in brackets point at the design (§) and requirements (REQ-) sections
   - Confirm `edit.spec.ts` and `browse.spec.ts` still pass.
   - _Requirements: REQ-7.3_
 
-- [ ] 10. Full verification and the Playwright MCP run (REQ-7.4, design §6.5)
+- [x] 10. Full verification and the Playwright MCP run (REQ-7.4, design §6.5)
+  - Done: on 2026-11-07 `npm run check`, `npm test` (75 files, 1097 tests), `npm run build`, `npm run server:build` and `npm run e2e` (30 passed) all passed, with the card-surface guard and the `src/share` boundary test inside `npm test`; the MCP run, console read, `localStorage` clear and `docs/screenshots/edit-background.png` are logged in `KIRO_USAGE.md` entry "2026-11-04 - Spec 10: edit-background". Exception, accepted without splitting: the "no file over ~300 lines" check is not met — `session.ts` 342 and `edit.css` 352 (the same pass counts `domHost.ts` 313, `main.ts` 378 and `library.ts` 318 in the other two specs).
   - Run the six checks; confirm the protected directories and `package.json` deps are unchanged, the card-surface
     guard and the `src/share` boundary stay green, and no file is over ~300 lines.
   - One MCP run against the dev server (already running on http://localhost:5173): flashcards → Edit → toggle Edit
