@@ -861,8 +861,8 @@ src/ui/edit untouched. parser.ts and evaluator.ts were already over the size gui
 ## 2026-11-04 — Spec 12: single-service-hosting (review of an outside draft, then the spec)
 Surface: CLI (Auto)
 Features: spec, steering
-Provenance, stated plainly: the code for this spec was not written in this Kiro session. It arrived as an
-uncommitted working-tree draft produced outside Kiro in a separate session — 13 modified files and three new ones
+Provenance, stated plainly: the code for this spec was written outside Kiro. It arrived as an
+uncommitted working-tree draft — 13 modified files and three new ones
 (server/static.ts, server/static.test.ts, server/fixtures/static/) — that folds the two-service Render layout
 (static site + necrocard-api web service) into one free web service. This session reviewed that draft against the
 steering, the summon spec and the brief, wrote spec 12 to document what the draft does, amended the summon spec with
