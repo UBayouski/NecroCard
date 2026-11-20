@@ -1132,3 +1132,23 @@ did not say so; it is now stated. edit-background 2 notes that activeObjects() r
 overlay and hit-testing depend on it) and that the private getters are card and background, not activeCard.
 stack-library 10 notes that Browse field typing is covered only by persist.test.ts. necrotalk-play 5 notes that its
 tests live in playVoice.test.ts. No new Playwright run was made: the 2026-11-04 entries are the evidence.
+
+## 2026-11-20 - Replace the favicon with a 1-bit two-card icon
+Surface: CLI
+Features: vibe
+What I asked for: replace the thin outlined ghost favicon, which was faint in a tab and soft on high-density screens, with
+a 1-bit drawing of two stacked cards and the ghost on the top card. Install it as `public/favicon.svg` with the exact
+content I gave, regenerate `public/favicon.ico` as the fallback from the same pixels, link both in `index.html`, keep
+the tests passing, add an end-to-end check for the SVG, and run the six checks.
+What Kiro did: the drawing was made outside Kiro; Kiro installed and checked it here. It wrote `public/favicon.svg`,
+then used a throwaway script (not committed) to read the rects from that file and write a 16x16 32-bit `favicon.ico`
+(1150 bytes, the two uncovered corners transparent). It decoded the .ico back to 16 rows of characters and compared it
+with the picture. It added `<link rel="icon" type="image/svg+xml" href="/favicon.svg" />` after the existing .ico link
+in `index.html`. In `test/e2e/browse.spec.ts` the favicon.ico size check now expects 1150 bytes instead of 198, because
+the file changed, and a new test checks that `/favicon.svg` answers 200 with `image/svg+xml`. `server/static.ts` already
+mapped `.svg`, and `server/fixtures/static/favicon.ico` was left alone. Checks: typecheck and lint clean, npm test 75
+files / 1097 tests passed, build and server:build clean, e2e 31 passed (30 before plus the new test). The built server
+answered /favicon.svg with 200 image/svg+xml and /favicon.ico with 200 image/x-icon, and dist/ holds both files.
+What changed because of it (time saved, bug caught, decision made): the tab icon is now two cards with the ghost, and
+browsers that take SVG get a sharp icon at any density while the rest fall back to the .ico. No gallery shot changes,
+because the icon is not in the page and the shots are page screenshots without browser chrome.

@@ -33,7 +33,13 @@ test('quiz: title → Q1 → Q2 → Q3 → Results', async ({ page }) => {
 test('favicon is served, so the browser logs no 404', async ({ page }) => {
   const res = await page.request.get('/favicon.ico');
   expect(res.status()).toBe(200);
-  expect((await res.body()).length).toBe(198);
+  expect((await res.body()).length).toBe(1150);
+});
+
+test('the SVG favicon is served as image/svg+xml', async ({ page }) => {
+  const res = await page.request.get('/favicon.svg');
+  expect(res.status()).toBe(200);
+  expect(res.headers()['content-type']).toContain('image/svg+xml');
 });
 
 // Summoned stacks put Next and Prev on the BACKGROUND. The full-size card-objects layer sits above the background
