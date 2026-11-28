@@ -1152,3 +1152,22 @@ answered /favicon.svg with 200 image/svg+xml and /favicon.ico with 200 image/x-i
 What changed because of it (time saved, bug caught, decision made): the tab icon is now two cards with the ghost, and
 browsers that take SVG get a sharp icon at any density while the rest fall back to the .ico. No gallery shot changes,
 because the icon is not in the page and the shots are page screenshots without browser chrome.
+
+## 2026-11-27 - Link-preview tags and a social image on the page shell
+Surface: CLI
+Features: vibe
+What I asked for: add a meta description, Open Graph and Twitter card tags, a theme-color and a noscript line to
+`index.html`; add a 1200 x 630 preview image to `public/` cropped from the best gallery screenshot; check the first
+frame before the script runs for a background flash; add one test; run the full verify.
+What Kiro did: added the tags to `index.html`. The description and `og:description` use the second sentence of the
+README opening; `og:url` and the absolute `og:image` / `twitter:image` use https://necrocard.onrender.com;
+`theme-color` is #f0f0f0, the skin's `--chrome-bg`. It cropped `public/og-image.png` (1200 x 630, 15109 bytes) from
+`docs/screenshots/gallery/02-browse.png` at x 40, y 130, 1:1, so the card title, question and three buttons show and
+nothing is redrawn or resampled. New test `src/ui/indexMeta.test.ts` reads `index.html` and checks every tag, and that
+`theme-color` equals `--chrome-bg` in `variables.css`. Built output keeps the tags and `dist/og-image.png` is
+byte-identical; the built server answered `/og-image.png` with 200 image/png, 15109 bytes. First frame: loaded the built
+page with JavaScript off and the body background is rgb(240, 240, 240), the same as the app, because the stylesheet is
+linked in the head and blocks first paint; no CSS change was made. Checks: typecheck and lint clean, npm test 76 files /
+1098 tests passed (one new), build and server:build clean, e2e 31 passed.
+What changed because of it: pasted links now get a title, sentence and card image. Nothing inside the app changed, so no
+gallery shot needs retaking.
